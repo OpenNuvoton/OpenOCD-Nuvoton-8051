@@ -32,12 +32,6 @@ Quickstart for the impatient
 
 If you are connecting a particular adapter with some specific target,
 you need to source both the jtag interface and the target configs,
-e.g.:
-
-  openocd -f ../scripts/interface/nulink.cfg -f ../scripts/target/numicroM0.cfg     (for NuMicro M0)
-  openocd -f ../scripts/interface/nulink.cfg -f ../scripts/target/numicroM4.cfg     (for NuMicro M4)
-  openocd -f ../scripts/interface/nulink.cfg -f ../scripts/target/numicroM23.cfg    (for NuMicro M23)
-  openocd -f ../scripts/interface/nulink.cfg -f ../scripts/target/numicroM23_NS.cfg (for NuMicro M23 Non-Secure)
 
 After OpenOCD startup, connect GDB with
 
