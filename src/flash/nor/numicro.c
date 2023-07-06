@@ -1182,7 +1182,36 @@ COMMAND_HANDLER(numicro_handle_chip_erase_command)
 
 	return ERROR_OK;
 }
+COMMAND_HANDLER(numicro_handle_memory_space_command)
+{
+	struct target *target = get_current_target(CMD_CTX);
+	struct numicro8051_common *numicro8051 = target_to_numicro8051(target);
+	uint32_t option;
+	if (CMD_ARGC != 1)
+		return ERROR_COMMAND_SYNTAX_ERROR;
 
+	//COMMAND_PARSE_NUMBER(u32, CMD_ARGV[0], option);
+	if(strcmp(CMD_ARGV[0], "D") == 0)
+	{
+		numicro8051->uMemorySpace = amDATA;
+	}
+	else if(strcmp(CMD_ARGV[0], "I") == 0)
+	{
+		numicro8051->uMemorySpace = amIDATA;
+	}
+	else if(strcmp(CMD_ARGV[0], "X") == 0)
+	{
+		numicro8051->uMemorySpace = amXDATA;
+	}
+	else
+	{
+		numicro8051->uMemorySpace = amCODE;
+	}
+
+	command_print(CMD_CTX, "numicro memory_space complete");
+
+	return ERROR_OK;	
+}
 
 static const struct command_registration numicro_exec_command_handlers[] = {
 	{
@@ -1197,6 +1226,12 @@ static const struct command_registration numicro_exec_command_handlers[] = {
 		.handler = numicro_handle_chip_erase_command,
 		.mode = COMMAND_EXEC,
 		.help = "whole chip erase.",
+	},
+	{
+		.name = "memory_space",
+		.handler = numicro_handle_memory_space_command,
+		.mode = COMMAND_EXEC,
+		.help = "change memory space.",
 	},
 	COMMAND_REGISTRATION_DONE
 };

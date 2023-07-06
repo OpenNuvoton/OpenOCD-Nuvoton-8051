@@ -2505,6 +2505,19 @@ int numicro8051_read_memory(struct target *target, uint32_t address,
 	unsigned long uZone, uAddr, uAddr_valid, address_align, offset = 0;
 	struct numicro8051_common *numicro8051 = target_to_numicro8051(target);
 
+	if (numicro8051->uMemorySpace == amDATA)
+	{
+		address = address + 0xF0000000;
+	}
+	else if (numicro8051->uMemorySpace == amIDATA)
+	{
+		address = address + 0xF1000000;
+	}
+	else if (numicro8051->uMemorySpace == amXDATA)
+	{
+		address = address + 0xF2000000;
+	}
+
 	uAddr_valid = (address & 0xFFFFFF) >> 16;
 	if (uAddr_valid == 0xFF) {
 		address_align = (address + size * count) & 0xFF000000;

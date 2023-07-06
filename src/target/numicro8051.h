@@ -59,6 +59,7 @@ struct numicro8051_common {
 	uint32_t uXRAMSize;
 	uint32_t uDeviceID;
 	uint32_t uPartID;
+	uint32_t uMemorySpace;
 	void *arch_info;
 	struct reg_cache *core_cache;
 	uint32_t core_regs[NUMICRO8051_NUM_CORE_REGS];
