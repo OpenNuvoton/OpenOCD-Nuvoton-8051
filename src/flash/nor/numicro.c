@@ -92,7 +92,7 @@
 #define ISPCMD_READ           0x00U
 #define ISPCMD_WRITE          0x21U
 #define ISPCMD_ERASE          0x22U
-#define ISPCMD_CHIPERASE      0x26U   /* Undocumented isp "Chip-Erase" command */
+#define ISPCMD_CHIPERASE      0x26U
 #define ISPCMD_READ_CID       0x0BU
 #define ISPCMD_READ_UID       0x04U
 #define ISPCMD_VECMAP         0x2EU
@@ -114,7 +114,6 @@
 #define OT8051_CONFIG_OCDEN				0x10
 
 #define OT8051_SID_N76E003				0x3600
-#define OT8051_SID_N76L151				0x3E00
 #define OT8051_SID_ML51_16K				0x4700
 #define OT8051_SID_ML51_32K				0x4800
 #define OT8051_SID_ML51_64K				0x4900
@@ -122,6 +121,8 @@
 #define OT8051_SID_MS51_8K				0x5200
 #define OT8051_SID_MS51_32K				0x5300
 #define OT8051_SID_ML56_64K				0x5700
+#define OT8051_SID_MUG51_16K			0x6300
+#define OT8051_SID_N76S003_MG51			0x6700
 
 #define N76E_SCODE_ADDR			0x4800	// N76E003
 #define ML51_SCODE_ADDR			0xFF80	// ML51, MS51, MUG51, MG51
@@ -132,23 +133,6 @@
 #define NUMICRO_SPROM_MASK        0x00000001UL
 #define NUMICRO_FLASH_OFFSET_MASK 0x00000004UL
 #define NUMICRO_SPROM_ISPDAT      0x55AA03UL
-
-
-
-//extern uint32_t g_uLIBROMAddr;
-//extern uint32_t g_uSCodeAddr;
-//extern uint32_t g_uLIBROMSize;
-//extern uint32_t g_uProgramFlashAddr;
-//extern uint32_t g_uProgramFlashSize;
-//extern uint32_t g_uSPROMAddr;
-//extern uint32_t g_uSPROMSize;
-//extern uint32_t g_uSPROMMode;
-//extern uint32_t g_bSupportSCode;
-//extern uint32_t g_uReadMemCount;
-//extern uint32_t g_uSFR_PageNum;
-//extern uint32_t g_uSFR_TKAddr;
-//extern uint32_t g_uSFR_TKSize;
-//extern uint32_t g_uXRAMSize;
 extern m_nulink_usb_handle;
 bool g_bErase = false;
 bool g_bUpdateConfig = false;
@@ -163,24 +147,7 @@ struct numicro_flash_bank_type {
 struct numicro_cpu_type {
 	char *partname;
 	uint32_t partid;
-//	unsigned int n_banks;
-//	struct numicro_flash_bank_type bank[NUMICRO_MAX_FLASH_BANKS];
 };
-
-///* If DataFlash size equals zero, it means the actual size depends on config settings. */
-//#define NUMICRO_BANKS_GENERAL(aprom_size, sprom_size, ldrom_size, config_size) \
-//	.n_banks = 4, \
-//	{{NUMICRO_APROM_BASE,  (aprom_size)}, \
-//	 {NUMICRO_SPROM_BASE,   (sprom_size)}, \
-//	 {NUMICRO_LDROM_BASE,  (ldrom_size)}, \
-//	 {NUMICRO_CONFIG_BASE, (config_size)}}
-//
-//#define NUMICRO_BANKS_OFFSET(aprom_size, sprom_size, ldrom_size, config_size) \
-//	.n_banks = 4, \
-//	{{NUMICRO_APROM_BASE,  (aprom_size)}, \
-//	 {NUMICRO_SPROM_BASE,   (sprom_size)}, \
-//	 {NUMICRO_LDROM_BASE,  (ldrom_size)}, \
-//	 {NUMICRO_CONFIG_BASE, (config_size)}}
 
 /* Get Flash Info by DID */
 typedef struct
@@ -283,34 +250,20 @@ static const struct numicro_cpu_type NuMicroParts[] = {
 	{"MUG51W",     0xFFFF6321},
 
 	{"MG51XB9AE", 0x05006721},
-	{"MG51XB9BE", 0x0E006721},
 	{"MG51FB9AE", 0x0B006721},
 	{"MG51XC9AE", 0x05006731},
-	{"MG51XC9BE", 0x0E006731},
 	{"MG51FC9AE", 0x0B006731},
 	{"N76S003AQ20", 0x05006750},
-	{"N76S003BQ20", 0x0E006750},
 	{"N76S003AT20", 0x0B006750},
 	{"UNKNOWN", 0x00000000},
 };
 
 FLASH_INFO_BY_DID_T g_FlashDIDs[] = {
-	// N76E885 (FA8251)
-	{ 18*1024, 0, 0x0100, 0x00002150, ((0 << 25) | (0 << 24) | (0x0E << 8) | (0 << 7) | (0 << 6) | (0 << 5) | (0 << 4) | (0 << 2) | (0 << 0))},
-	{ 18*1024, 0, 0x0100, 0x00002140, ((0 << 25) | (0 << 24) | (0x0E << 8) | (0 << 7) | (0 << 6) | (0 << 5) | (0 << 4) | (0 << 2) | (1 << 0))},
-
-	// N76E616 (FA8261)
-	{ 18*1024, 0, 0x0100, 0x00002F50, ((0 << 25) | (0 << 24) | (0x0E << 8) | (0 << 7) | (0 << 6) | (0 << 5) | (0 << 4) | (1 << 2) | (0 << 0))},
-
-	// N76E003 (FA8265)
+	// N76E003
 	{ 18*1024, 0, 0x0300, 0x00003650, ((0 << 25) | (0 << 24) | (0x0E << 8) | (0 << 7) | (0 << 6) | (0 << 5) | (0 << 4) | (0 << 2) | (0 << 0))},
 	{ 18*1024, 0, 0x0300, 0x00003640, ((0 << 25) | (0 << 24) | (0x0E << 8) | (0 << 7) | (0 << 6) | (0 << 5) | (0 << 4) | (0 << 2) | (1 << 0))},
 
-	// N76L151 (Closed)
-	//{ 32*1024, 0, 0x1000, 0x00003E60, 0},
-	//{ 32*1024, 0, 0x0800, 0x00003E61, 0},
-
-	// ML51 (HAG023, HAG024)
+	// ML51
 	{  8*1024, 0, 0x0400, 0x00004711, ((0 << 25) | (1 << 24) | (0x0F << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 	{ 16*1024, 0, 0x0400, 0x00004721, ((0 << 25) | (1 << 24) | (0x0F << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 
@@ -320,7 +273,7 @@ FLASH_INFO_BY_DID_T g_FlashDIDs[] = {
 	{ 32*1024, 0, 0x0800, 0x00004932, ((0 << 25) | (1 << 24) | (0x0F << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 	{ 64*1024, 0, 0x1000, 0x00004944, ((0 << 25) | (1 << 24) | (0x0F << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 
-	// MS51 (HAG030, HAG034, HAG035)
+	// MS51
 	{  8*1024, 0, 0x0200, 0x00004B10, ((0 << 25) | (1 << 24) | (0x0E << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 	{  8*1024, 0, 0x0400, 0x00004B11, ((0 << 25) | (1 << 24) | (0x0E << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 	{ 16*1024, 0, 0x0200, 0x00004B20, ((0 << 25) | (1 << 24) | (0x0E << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
@@ -331,15 +284,14 @@ FLASH_INFO_BY_DID_T g_FlashDIDs[] = {
 	{ 16*1024, 0, 0x0800, 0x00005322, ((0 << 25) | (1 << 24) | (0x0E << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 	{ 32*1024, 0, 0x0800, 0x00005332, ((0 << 25) | (1 << 24) | (0x0E << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 
-	// ML56 (HAG037)
+	// ML56
 	{ 32*1024, 0, 0x1000, 0x00005734, ((1 << 25) | (1 << 24) | (0x07 << 8) | (1 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 	{ 64*1024, 0, 0x1000, 0x00005744, ((1 << 25) | (1 << 24) | (0x07 << 8) | (1 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 
-	// MUG51 (HAG049)
+	// MUG51
 	{ 16*1024, 0, 0x0400, 0x00006321, ((1 << 25) | (1 << 24) | (0x0F << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 
-	// MG51, N76S003 (KAG056)
-	//{ 18*1024, 0, 0x0300, 0x00006750, ((0 << 25) | (0 << 24) | (0x0E << 8) | (0 << 7) | (0 << 6) | (0 << 5) | (0 << 4) | (0 << 2) | (0 << 0))},
+	// MG51, N76S003
 	{ 18*1024, 0, 0x0400, 0x00006750, ((0 << 25) | (0 << 24) | (0x0E << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 	{ 16*1024, 0, 0x0400, 0x00006721, ((0 << 25) | (1 << 24) | (0x0E << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
 	{ 32*1024, 0, 0x0400, 0x00006731, ((0 << 25) | (1 << 24) | (0x0E << 8) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (0 << 2) | (0 << 0))},
@@ -352,15 +304,7 @@ struct  numicro_flash_bank {
 	const struct numicro_cpu_type *cpu;
 };
 
-enum numicro_m23_secure_debug_state {
-	NUMICRO_M23_SECURE_DEBUG_NORMAL = 0, /* M23 Normal Debug */
-	NUMICRO_M23_SECURE_DEBUG_S,  /* M23 Secure Debug Enabled */
-	NUMICRO_M23_SECURE_DEBUG_NS, /* M23 Secure Debug Disabled */
-};
-
 /* Private variables */
-//uint32_t m_pageSize = NUMICRO_8051_SECTORSIZE;
-//uint32_t m_flashInfo = 0; /* bit 0:SPROM exists; */
 char *m_target_name = "";
 
 void *GetInfo_8051_1T(unsigned int uDID,
@@ -470,6 +414,9 @@ FLASH_DID_INFO_T *GetInfo(unsigned int uDID,
 			pInfo->uSFR_PageNum		= (uSID == OT8051_SID_MS51_32K) ? 3 : 0;
 			pInfo->pszSeriesName	= "MS51";
 
+			if (((uPID >> 12) & 0x0F) == 0x01)
+				pInfo->pszSeriesName= "NM1800";
+
 			break;
 		}
 		case OT8051_SID_ML56_64K:
@@ -489,6 +436,29 @@ FLASH_DID_INFO_T *GetInfo(unsigned int uDID,
 			pInfo->pszSeriesName	= "ML51";
 			break;
 		}
+		case OT8051_SID_MUG51_16K:
+		{
+			pInfo->uSPROM_Addr		= 0x20180;
+			pInfo->uSPROM_Mode		= 0;
+			pInfo->uSCODE_Addr		= ML51_SCODE_ADDR;
+			pInfo->uLIBROM_Addr		= 0x4000;
+			pInfo->uLIBROM_Size		= 0x1000;
+			pInfo->uSFR_PageNum		= 4;
+			pInfo->pszSeriesName	= "MUG51";
+			break;
+		}
+		case OT8051_SID_N76S003_MG51:
+		{
+			pInfo->uSPROM_Addr		= 0x20180;
+			pInfo->uSPROM_Mode		= 0;
+			pInfo->uSCODE_Addr		= ML51_SCODE_ADDR;
+			pInfo->uSFR_PageNum		= 0;
+			if (((uDID >> 4) & 0x0F) == 0x05)
+				pInfo->pszSeriesName= "N76S003";
+			else
+				pInfo->pszSeriesName= "MG51";
+			break;
+		}
 	}
 
 	return pInfo;
@@ -497,23 +467,9 @@ FLASH_DID_INFO_T *GetInfo(unsigned int uDID,
 static int numicro_writeblock(struct flash_bank *bank, const uint8_t *buffer,
 		uint32_t offset, uint32_t count)
 {
-	//LOG_DEBUG("numicro_writeblock");
 	struct target *target = bank->target;
 	struct numicro8051_common *numicro8051 = target_to_numicro8051(target);
-	//LOG_DEBUG("bank->base: 0x%x, addr: 0x%x, size: 0x%x",bank->base, offset, count);
 
-//	struct hl_interface_s *adapter = target->tap->priv;
-//	uint32_t buffer_size = 1024; /* Default minimum value */
-//	uint32_t totalCount = count;
-//	uint32_t thisrun_count = 0;
-//	uint32_t address = bank->base + offset;
-//	struct reg_param reg_params[6];
-//	struct numicro8051_common *numicro8051 = target_to_numicro8051(target);
-//	struct armv7m_algorithm armv7m_info;
-//	uint32_t algorithm_programPage_entry_offset = 0;
-//	uint32_t algorithm_lr = 0;
-//	bool bSPIMFlashWrite = (bank->base + offset < NUMICRO_SPIM_FLASH_START_ADDRESS)? 0 : 1;
-//	bool bDFMCFlashWrite = (bank->base + offset < NUMICRO_DATA_DFMC_BASE)? 0 : 1;
 	int retval = ERROR_OK;
 
 	unsigned int uLen_this;
@@ -522,152 +478,112 @@ static int numicro_writeblock(struct flash_bank *bank, const uint8_t *buffer,
 
 	nAdr &= 0xFFFFFF;
 
-//	if (numicro8051->uMcuType == NUC_CHIP_TYPE_GENERAL_1T)
-//	{
-		unsigned int uAddr_c = nAdr, uAddr_s = numicro8051->uSCodeAddr;
-		unsigned int uLen_c = 0, uLen_ec = 0, uLen_s = 0, uLen_es = 0;
+	unsigned int uAddr_c = nAdr, uAddr_s = numicro8051->uSCodeAddr;
+	unsigned int uLen_c = 0, uLen_ec = 0, uLen_s = 0, uLen_es = 0;
 
-		if (numicro8051->uSCodeAddr >= numicro8051->uProgramFlashSize)
+	if (numicro8051->uSCodeAddr >= numicro8051->uProgramFlashSize)
+	{
+		if (nAdr < numicro8051->uProgramFlashSize)
 		{
-			if (nAdr < numicro8051->uProgramFlashSize)
+			if ((nAdr + nMany) > (numicro8051->uSCodeAddr + numicro8051->uSPROMSize))
 			{
-				if ((nAdr + nMany) > (numicro8051->uSCodeAddr + numicro8051->uSPROMSize))
-				{
-					uLen_c	= numicro8051->uProgramFlashSize - nAdr;
-					uLen_ec	= numicro8051->uSCodeAddr - numicro8051->uProgramFlashSize;
-					uLen_s	= numicro8051->uSPROMSize;
-					uLen_es	= (nAdr + nMany) - (numicro8051->uSCodeAddr + numicro8051->uSPROMSize);
-				}
-				else if ((nAdr + nMany) > numicro8051->uSCodeAddr)
-				{
-					uLen_c	= numicro8051->uProgramFlashSize - nAdr;
-					uLen_ec	= numicro8051->uSCodeAddr - numicro8051->uProgramFlashSize;
-					uLen_s	= (nAdr + nMany) - numicro8051->uSCodeAddr;
-					uLen_es	= 0;
-				}
-				else if ((nAdr + nMany) > numicro8051->uProgramFlashSize)
-				{
-					uLen_c	= numicro8051->uProgramFlashSize - nAdr;
-					uLen_ec	= (nAdr + nMany) - numicro8051->uProgramFlashSize;
-					uLen_s	= 0;
-					uLen_es	= 0;
-				}
-				else
-				{
-					uLen_c	= nMany;
-					uLen_ec	= 0;
-					uLen_s	= 0;
-					uLen_es	= 0;
-				}
+				uLen_c	= numicro8051->uProgramFlashSize - nAdr;
+				uLen_ec	= numicro8051->uSCodeAddr - numicro8051->uProgramFlashSize;
+				uLen_s	= numicro8051->uSPROMSize;
+				uLen_es	= (nAdr + nMany) - (numicro8051->uSCodeAddr + numicro8051->uSPROMSize);
 			}
-			else if (nAdr < numicro8051->uSCodeAddr)
+			else if ((nAdr + nMany) > numicro8051->uSCodeAddr)
 			{
-				if ((nAdr + nMany) > (numicro8051->uSCodeAddr + numicro8051->uSPROMSize))
-				{
-					uLen_c	= 0;
-					uLen_ec	= numicro8051->uSCodeAddr - nAdr;
-					uLen_s	= numicro8051->uSPROMSize;
-					uLen_es	= (nAdr + nMany) - (numicro8051->uSCodeAddr + numicro8051->uSPROMSize);
-				}
-				else if ((nAdr + nMany) > numicro8051->uSCodeAddr)
-				{
-					uLen_c	= 0;
-					uLen_ec	= numicro8051->uSCodeAddr - nAdr;
-					uLen_s	= (nAdr + nMany) - numicro8051->uSCodeAddr;
-					uLen_es	= 0;
-				}
-				else
-				{
-					uLen_c	= 0;
-					uLen_ec	= nMany;
-					uLen_s	= 0;
-					uLen_es	= 0;
-				}
+				uLen_c	= numicro8051->uProgramFlashSize - nAdr;
+				uLen_ec	= numicro8051->uSCodeAddr - numicro8051->uProgramFlashSize;
+				uLen_s	= (nAdr + nMany) - numicro8051->uSCodeAddr;
+				uLen_es	= 0;
 			}
-			else if (nAdr < (numicro8051->uSCodeAddr + numicro8051->uSPROMSize))
+			else if ((nAdr + nMany) > numicro8051->uProgramFlashSize)
 			{
-				uAddr_s = nAdr;
+				uLen_c	= numicro8051->uProgramFlashSize - nAdr;
+				uLen_ec	= (nAdr + nMany) - numicro8051->uProgramFlashSize;
+				uLen_s	= 0;
+				uLen_es	= 0;
+			}
+			else
+			{
+				uLen_c	= nMany;
+				uLen_ec	= 0;
+				uLen_s	= 0;
+				uLen_es	= 0;
+			}
+		}
+		else if (nAdr < numicro8051->uSCodeAddr)
+		{
+			if ((nAdr + nMany) > (numicro8051->uSCodeAddr + numicro8051->uSPROMSize))
+			{
+				uLen_c	= 0;
+				uLen_ec	= numicro8051->uSCodeAddr - nAdr;
+				uLen_s	= numicro8051->uSPROMSize;
+				uLen_es	= (nAdr + nMany) - (numicro8051->uSCodeAddr + numicro8051->uSPROMSize);
+			}
+			else if ((nAdr + nMany) > numicro8051->uSCodeAddr)
+			{
+				uLen_c	= 0;
+				uLen_ec	= numicro8051->uSCodeAddr - nAdr;
+				uLen_s	= (nAdr + nMany) - numicro8051->uSCodeAddr;
+				uLen_es	= 0;
+			}
+			else
+			{
+				uLen_c	= 0;
+				uLen_ec	= nMany;
+				uLen_s	= 0;
+				uLen_es	= 0;
+			}
+		}
+		else if (nAdr < (numicro8051->uSCodeAddr + numicro8051->uSPROMSize))
+		{
+			uAddr_s = nAdr;
 
-				if ((nAdr + nMany) > (numicro8051->uSCodeAddr + numicro8051->uSPROMSize))
-				{
-					uLen_c	= 0;
-					uLen_ec	= 0;
-					uLen_s	= (numicro8051->uSCodeAddr + numicro8051->uSPROMSize) - nAdr;
-					uLen_es	= (nAdr + nMany) - (numicro8051->uSCodeAddr + numicro8051->uSPROMSize);
-				}
-				else
-				{
-					uLen_c	= 0;
-					uLen_ec	= 0;
-					uLen_s	= nMany;
-					uLen_es	= 0;
-				}
+			if ((nAdr + nMany) > (numicro8051->uSCodeAddr + numicro8051->uSPROMSize))
+			{
+				uLen_c	= 0;
+				uLen_ec	= 0;
+				uLen_s	= (numicro8051->uSCodeAddr + numicro8051->uSPROMSize) - nAdr;
+				uLen_es	= (nAdr + nMany) - (numicro8051->uSCodeAddr + numicro8051->uSPROMSize);
 			}
 			else
 			{
 				uLen_c	= 0;
 				uLen_ec	= 0;
-				uLen_s	= 0;
-				uLen_es	= nMany;
+				uLen_s	= nMany;
+				uLen_es	= 0;
 			}
 		}
-		else //if (numicro8051->uSCodeAddr < numicro8051->uProgramFlashSize)
+		else
 		{
-			if (nAdr < numicro8051->uProgramFlashSize)
+			uLen_c	= 0;
+			uLen_ec	= 0;
+			uLen_s	= 0;
+			uLen_es	= nMany;
+		}
+	}
+	else
+	{
+		if (nAdr < numicro8051->uProgramFlashSize)
+		{
 			{
-				if (1)//g_Params.uUpdateSPROM)
-				{
-					if (nAdr < numicro8051->uSCodeAddr)
-					{
-						if ((nAdr + nMany) > numicro8051->uProgramFlashSize)
-						{
-							uLen_c	= numicro8051->uSCodeAddr - nAdr;
-							uLen_ec	= 0;
-							uLen_s	= numicro8051->uProgramFlashSize - numicro8051->uSCodeAddr;
-							uLen_es	= (nAdr + nMany) - numicro8051->uProgramFlashSize;
-						}
-						else if ((nAdr + nMany) > numicro8051->uSCodeAddr)
-						{
-							uLen_c	= numicro8051->uSCodeAddr - nAdr;
-							uLen_ec	= 0;
-							uLen_s	= (nAdr + nMany) - numicro8051->uSCodeAddr;
-							uLen_es	= 0;
-						}
-						else
-						{
-							uLen_c	= nMany;
-							uLen_ec	= 0;
-							uLen_s	= 0;
-							uLen_es	= 0;
-						}
-					}
-					else
-					{
-						uAddr_s = nAdr;
-
-						if ((nAdr + nMany) > numicro8051->uProgramFlashSize)
-						{
-							uLen_c	= 0;
-							uLen_ec	= 0;
-							uLen_s	= numicro8051->uProgramFlashSize - nAdr;
-							uLen_es	= (nAdr + nMany) - numicro8051->uProgramFlashSize;
-						}
-						else
-						{
-							uLen_c	= 0;
-							uLen_ec	= 0;
-							uLen_s	= nMany;
-							uLen_es	= 0;
-						}
-					}
-				}
-				else
+				if (nAdr < numicro8051->uSCodeAddr)
 				{
 					if ((nAdr + nMany) > numicro8051->uProgramFlashSize)
 					{
-						uLen_c	= numicro8051->uProgramFlashSize - nAdr;
-						uLen_ec	= (nAdr + nMany) - numicro8051->uProgramFlashSize;
-						uLen_s	= 0;
+						uLen_c	= numicro8051->uSCodeAddr - nAdr;
+						uLen_ec	= 0;
+						uLen_s	= numicro8051->uProgramFlashSize - numicro8051->uSCodeAddr;
+						uLen_es	= (nAdr + nMany) - numicro8051->uProgramFlashSize;
+					}
+					else if ((nAdr + nMany) > numicro8051->uSCodeAddr)
+					{
+						uLen_c	= numicro8051->uSCodeAddr - nAdr;
+						uLen_ec	= 0;
+						uLen_s	= (nAdr + nMany) - numicro8051->uSCodeAddr;
 						uLen_es	= 0;
 					}
 					else
@@ -678,109 +594,120 @@ static int numicro_writeblock(struct flash_bank *bank, const uint8_t *buffer,
 						uLen_es	= 0;
 					}
 				}
-			}
-			else
-			{
-				uLen_c	= 0;
-				uLen_ec	= 0;//(g_Params.uUpdateSPROM)? 0 : nMany;
-				uLen_s	= 0;
-				uLen_es	= nMany - uLen_ec;
+				else
+				{
+					uAddr_s = nAdr;
+
+					if ((nAdr + nMany) > numicro8051->uProgramFlashSize)
+					{
+						uLen_c	= 0;
+						uLen_ec	= 0;
+						uLen_s	= numicro8051->uProgramFlashSize - nAdr;
+						uLen_es	= (nAdr + nMany) - numicro8051->uProgramFlashSize;
+					}
+					else
+					{
+						uLen_c	= 0;
+						uLen_ec	= 0;
+						uLen_s	= nMany;
+						uLen_es	= 0;
+					}
+				}
 			}
 		}
+		else
+		{
+			uLen_c	= 0;
+			uLen_ec	= 0;
+			uLen_s	= 0;
+			uLen_es	= nMany - uLen_ec;
+		}
+	}
 
-		if ((uLen_ec > 0) || (uLen_es > 0))
+	if ((uLen_ec > 0) || (uLen_es > 0))
+	{
+		return ERROR_FAIL;
+	}
+
+	if (uLen_s)
+	{
+		if (!(numicro8051->bSupportSCode ))
 		{
 			return ERROR_FAIL;
 		}
+	}
 
-		if (uLen_s)
+	if (uLen_c)
+	{
+		while (uLen_c)
 		{
-			if (!(numicro8051->bSupportSCode ))//&& g_Params.uUpdateSPROM))
-			{
-				return ERROR_FAIL;
-			}
-		}
+			uLen_this = uLen_c;
 
-		if (uLen_c)
-		{
-			while (uLen_c)
-			{
-				uLen_this = uLen_c;
+			if (uLen_this > 32)
+				uLen_this = 32;
 
-				if (uLen_this > 32)
-					uLen_this = 32;
-
-				retval = nulink_write_flash((uAddr_c + numicro8051->uProgramFlashAddr), uLen_this, (unsigned char *)buffer);
-//				for (uint32_t index = 0; index < uLen_this; index++) {
-//					LOG_DEBUG("0x%x\n", buffer[index]);
-//				}
-				if(retval != ERROR_OK) {
-					LOG_DEBUG("write flash failed");
-					return retval;
-				}
-
-				buffer	+= uLen_this;
-				uAddr_c	+= uLen_this;
-				uLen_c	-= uLen_this;
-			}
-
-			retval = nulink_set_flash_mode();
+			retval = nulink_write_flash((uAddr_c + numicro8051->uProgramFlashAddr), uLen_this, (unsigned char *)buffer);
 			if(retval != ERROR_OK) {
-				LOG_DEBUG("nulink_set_flash_mode failed");
+				LOG_DEBUG("write flash failed");
 				return retval;
 			}
-//			g_pICE->SetFlashMode(CICE::FLASH_MODE_FLUSH);
+
+			buffer	+= uLen_this;
+			uAddr_c	+= uLen_this;
+			uLen_c	-= uLen_this;
 		}
 
-		if (uLen_s)
+		retval = nulink_set_flash_mode();
+		if(retval != ERROR_OK) {
+			LOG_DEBUG("nulink_set_flash_mode failed");
+			return retval;
+		}
+	}
+
+	if (uLen_s)
+	{
+		if (numicro8051->uSPROMMode)
 		{
-			if (numicro8051->uSPROMMode)
-			{
-				retval = nulink_flash_sprom_init();
-				if(retval != ERROR_OK) {
-					LOG_DEBUG("flash init failed");
-					return retval;
-				}
-			}
-
-			while (uLen_s)
-			{
-				uLen_this = uLen_s;
-
-				if (uLen_this > 32)
-					uLen_this = 32;
-
-				retval = nulink_write_flash((uAddr_s - numicro8051->uSCodeAddr + numicro8051->uSPROMAddr), uLen_this, (unsigned char *)buffer);
-//				for (uint32_t index = 0; index < uLen_this; index++) {
-//					LOG_DEBUG("0x%x\n", buffer[index]);
-//				}
-				if(retval != ERROR_OK) {
-					LOG_DEBUG("write flash failed");
-					return retval;
-				}
-
-				buffer	+= uLen_this;
-				uAddr_s	+= uLen_this;
-				uLen_s	-= uLen_this;
-			}
-
-			retval = nulink_set_flash_mode();
+			retval = nulink_flash_sprom_init();
 			if(retval != ERROR_OK) {
-				LOG_DEBUG("nulink_set_flash_mode failed");
+				LOG_DEBUG("flash init failed");
 				return retval;
 			}
-//			g_pICE->SetFlashMode(CICE::FLASH_MODE_FLUSH);
+		}
 
-			if (numicro8051->uSPROMMode)
-			{
-				retval = nulink_flash_sprom_uninit(numicro8051->uSPROMMode);
-				if(retval != ERROR_OK) {
-					LOG_DEBUG("disconnect failed");
-					return retval;
-				}
+		while (uLen_s)
+		{
+			uLen_this = uLen_s;
+
+			if (uLen_this > 32)
+				uLen_this = 32;
+
+			retval = nulink_write_flash((uAddr_s - numicro8051->uSCodeAddr + numicro8051->uSPROMAddr), uLen_this, (unsigned char *)buffer);
+			if(retval != ERROR_OK) {
+				LOG_DEBUG("write flash failed");
+				return retval;
+			}
+
+			buffer	+= uLen_this;
+			uAddr_s	+= uLen_this;
+			uLen_s	-= uLen_this;
+		}
+
+		retval = nulink_set_flash_mode();
+		if(retval != ERROR_OK) {
+			LOG_DEBUG("nulink_set_flash_mode failed");
+			return retval;
+		}
+
+		if (numicro8051->uSPROMMode)
+		{
+			retval = nulink_flash_sprom_uninit(numicro8051->uSPROMMode);
+			if(retval != ERROR_OK) {
+				LOG_DEBUG("disconnect failed");
+				return retval;
 			}
 		}
-//	}
+	}
 
 	return ERROR_OK;
 }
@@ -788,7 +715,6 @@ static int numicro_writeblock(struct flash_bank *bank, const uint8_t *buffer,
 /* Flash Lock checking - examines the lock bit. */
 static int numicro_protect_check(struct flash_bank *bank)
 {
-	//LOG_DEBUG("numicro_protect_check");
 	struct target *target = bank->target;
 	uint32_t set, config[2];
 	int i, retval = ERROR_OK;
@@ -833,7 +759,6 @@ static int numicro_protect_check(struct flash_bank *bank)
 
 static int numicro_erase(struct flash_bank *bank, int first, int last)
 {
-	//LOG_DEBUG("numicro_erase");
 	struct target *target = bank->target;
 	struct numicro8051_common *numicro8051 = target_to_numicro8051(target);
 	int retval = ERROR_OK;
@@ -872,7 +797,6 @@ static int numicro_erase(struct flash_bank *bank, int first, int last)
 static int numicro_write(struct flash_bank *bank, const uint8_t *buffer,
 		uint32_t offset, uint32_t count)
 {
-	//LOG_DEBUG("numicro_write");
 	struct target *target = bank->target;
 	int retval = ERROR_OK;
 
@@ -884,7 +808,7 @@ static int numicro_write(struct flash_bank *bank, const uint8_t *buffer,
 	LOG_INFO("Nuvoton NuMicro: Flash Write ...");
 
 	retval = nulink_flash_init();
-	//LOG_DEBUG("nulink_flash_init retval: %d", retval);
+
 	if(retval != ERROR_OK)
 		return retval;	
 
@@ -893,8 +817,6 @@ static int numicro_write(struct flash_bank *bank, const uint8_t *buffer,
 	if(retval != ERROR_OK)
 		return retval;	
 
-	//retval = nulink_flash_uninit();
-	//LOG_DEBUG("nulink_flash_uninit retval: %d", retval);
 	/* done. */
 	LOG_DEBUG("Write done.");
 
@@ -903,25 +825,23 @@ static int numicro_write(struct flash_bank *bank, const uint8_t *buffer,
 
 static int numicro_get_cpu_type(struct target *target, const struct numicro_cpu_type** cpu)
 {
-	//LOG_DEBUG("numicro_get_cpu_type");
 	struct hl_interface_s *adapter = target->tap->priv;
 	struct numicro8051_common *numicro8051 = target_to_numicro8051(target);
 	int retval;
 	uint32_t uCheckID = 0, uDeviceID = 0, uPID = 0, config[2];
-	numicro8051->uPartID = 0x3650;//0xABCDEF12;
+	numicro8051->uPartID = 0x3650;
 
 	retval = nulink_flash_init();
-//	LOG_DEBUG("nulink_flash_init retval: %d", retval);
+
 	if(retval != ERROR_OK)
 		return retval;	
 
 	retval = adapter->layout->api->idcode(adapter->handle, &uCheckID);
 	if (retval != ERROR_OK)
 		return retval;
-//	LOG_DEBUG("uCheckID: 0x%x", uCheckID);
+
 	uCheckID = uCheckID & 0xFFFFFF;
 	uDeviceID	= uCheckID & 0xFFFF;
-//	LOG_DEBUG("uDeviceID: 0x%x", uDeviceID);
 
 	FLASH_DID_INFO_T flashInfo;
 	FLASH_INFO_BY_DID_T flashInfo2;
@@ -955,8 +875,7 @@ static int numicro_get_cpu_type(struct target *target, const struct numicro_cpu_
 				LOG_DEBUG("Read config failed");
 				return retval;	
 			}
-//			retval = nulink_flash_uninit();
-			//LOG_DEBUG("nulink_flash_uninit retval: %d", retval);
+
 			if(retval != ERROR_OK)
 				return retval;	
 
@@ -989,25 +908,11 @@ static int numicro_get_cpu_type(struct target *target, const struct numicro_cpu_
 
 			numicro8051->bSupportSCode	= flashInfo2.feature.bSupportSCode;
 
-		//	LOG_INFO("Device ID: 0x%08" PRIx32 "", part_id);
-		//	/* search part numbers */
+			/* search part numbers */
 			for (size_t i = 0; i < sizeof(NuMicroParts) / sizeof(NuMicroParts[0]); i++) {
 				if (numicro8051->uPartID == NuMicroParts[i].partid) {
 					*cpu = &NuMicroParts[i];
 					LOG_INFO("Device Name: %s", (*cpu)->partname);
-//					LOG_INFO("numicro8051->uPartID: 0x%x", numicro8051->uPartID);
-//					LOG_DEBUG("numicro8051->uProgramFlashSize: 0x%x", numicro8051->uProgramFlashSize);
-//					LOG_DEBUG("numicro8051->uXRAMSize: 0x%x", numicro8051->uXRAMSize);
-//					LOG_DEBUG("numicro8051->uSPROMAddr: 0x%x", numicro8051->uSPROMAddr);
-//					LOG_DEBUG("numicro8051->uSPROMSize: 0x%x", numicro8051->uSPROMSize);
-//					LOG_DEBUG("numicro8051->uSPROMMode: 0x%x", numicro8051->uSPROMMode);
-//					LOG_DEBUG("numicro8051->uSCodeAddr: 0x%x", numicro8051->uSCodeAddr);
-//					LOG_DEBUG("numicro8051->uLIBROMAddr: 0x%x", numicro8051->uLIBROMAddr);
-//					LOG_DEBUG("numicro8051->uLIBROMSize: 0x%x", numicro8051->uLIBROMSize);
-//					LOG_DEBUG("numicro8051->uSFR_PageNum: 0x%x", numicro8051->uSFR_PageNum);
-//					LOG_DEBUG("numicro8051->uSFR_TKAddr: 0x%x", numicro8051->uSFR_TKAddr);
-//					LOG_DEBUG("numicro8051->uSFR_TKSize: 0x%x", numicro8051->uSFR_TKSize);
-//					LOG_DEBUG("numicro8051->bSupportSCode: 0x%x", numicro8051->bSupportSCode);
 					return ERROR_OK;
 				}
 			}
@@ -1031,13 +936,12 @@ static int numicro_probe(struct flash_bank *bank)
 	const struct numicro_cpu_type *cpu;
 	struct target *target = bank->target;
 	struct numicro8051_common *numicro8051 = target_to_numicro8051(target);
-//	struct armv7m_common *armv7m = target_to_armv7m(target);
+
 	int retval = ERROR_OK;
-//
+
 	retval = numicro_get_cpu_type(target, &cpu);
 	if (retval != ERROR_OK) {
 		LOG_WARNING("NuMicro flash driver: Failed to detect a known part");
-		/* return ERROR_FLASH_OPERATION_FAILED; */
 	}
 
 	if (bank->base == ML51_SCODE_ADDR) {
@@ -1046,16 +950,6 @@ static int numicro_probe(struct flash_bank *bank)
 	else {
 		flash_size = numicro8051->uProgramFlashSize;
 	}
-//
-//	retval = numicro_get_flash_size(bank, cpu, &flash_size);
-//	if (retval != ERROR_OK) {
-//		LOG_WARNING("NuMicro flash driver: Failed to detect flash size");
-//		/* return ERROR_FLASH_OPERATION_FAILED; */
-//	}
-
-	//m_target_name = "NU8051";
-
-//	LOG_DEBUG("target name: %s, flash_size: 0x%x\n", (*cpu).partname, flash_size);
 
 	num_pages = flash_size / page_size;
 	bank->num_sectors = num_pages;
@@ -1081,9 +975,8 @@ static int numicro_probe(struct flash_bank *bank)
 /* Standard approach to auto-probing. */
 static int numicro_auto_probe(struct flash_bank *bank)
 {
-	//LOG_DEBUG("numicro_auto_probe");
 	struct numicro_flash_bank *numicro_info = bank->driver_priv;
-	//LOG_DEBUG("info:0x%x, config:0x%x", numicro_info->probed, g_bUpdateConfig);
+
 	if (numicro_info->probed && (g_bUpdateConfig == false))
 		return ERROR_OK;
 	return numicro_probe(bank);
@@ -1132,12 +1025,10 @@ COMMAND_HANDLER(numicro_handle_update_config_command)
 	nulink_erase_flash(OT8051_FLASH_CONFIG_ADDR, OT8051_FLASH_CONFIG_SIZE);
 	nulink_write_flash(OT8051_FLASH_CONFIG_ADDR, OT8051_FLASH_CONFIG_SIZE, (unsigned char *)config);
 	nulink_set_flash_mode();
-//	nulink_flash_uninit();
 
 	LOG_INFO("numicro update_config 0x%08" PRIx32 " 0x%08" PRIx32, config[0], config[1]);
 
 	retval = adapter->layout->api->halt(adapter->handle);
-	//retval = nulink_8051_reset(adapter->handle);
 
 	g_bUpdateConfig = true;
 
@@ -1174,8 +1065,6 @@ COMMAND_HANDLER(numicro_handle_chip_erase_command)
 	nulink_write_flash(OT8051_FLASH_CONFIG_ADDR, OT8051_FLASH_CONFIG_SIZE, (unsigned char *)config);
 	nulink_set_flash_mode();
 
-//	nulink_flash_uninit();
-
 	command_print(CMD_CTX, "numicro chip_erase complete");
 
 	g_bUpdateConfig = true;
@@ -1186,11 +1075,10 @@ COMMAND_HANDLER(numicro_handle_memory_space_command)
 {
 	struct target *target = get_current_target(CMD_CTX);
 	struct numicro8051_common *numicro8051 = target_to_numicro8051(target);
-	uint32_t option;
+
 	if (CMD_ARGC != 1)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 
-	//COMMAND_PARSE_NUMBER(u32, CMD_ARGV[0], option);
 	if(strcmp(CMD_ARGV[0], "D") == 0)
 	{
 		numicro8051->uMemorySpace = amDATA;

@@ -28,7 +28,6 @@
 #include <jtag/hla/hla_interface.h>
 #include <target/target.h>
 #include <target/cortex_m.h>
-//#include <target/numicro8051.h>
 #include "log.h"
 #include "libusb_common.h"
 #include <unistd.h>
@@ -76,7 +75,7 @@ struct nulink_usb_handle_s {
 	uint8_t databuf[NULINK2_HID_MAX_SIZE];
 	uint32_t max_mem_packet;
 	enum hl_transports transport;
-	uint16_t hardwareConfig; /* bit 0: 1:Nu-Link-Pro, 0:Normal Nu-Link | bit 1: 1:Nu-Link2, 0:Nu-Link */
+	uint16_t hardwareConfig;
 	uint32_t reset_command;
 	uint32_t connect_command;
 	uint32_t extMode_command;
@@ -332,8 +331,6 @@ static int nulink_usb_version(void *handle)
 	int res;
 	struct nulink_usb_handle_s *h = handle;
 
-	//LOG_DEBUG("nulink_usb_version");
-
 	assert(handle != NULL);
 
 	m_nulink_usb_api.nulink_usb_init_buffer(handle, V6M_MAX_COMMAND_LENGTH);
@@ -372,8 +369,6 @@ static int nulink_usb_assert_srst(void *handle, int srst);
 
 static int nulink_usb_write_debug_reg(void *handle, uint32_t addr, uint32_t val)
 {
-	//LOG_DEBUG("nulink_usb_write_debug_reg");
-
 	int res;
 	struct nulink_usb_handle_s *h = handle;
 
@@ -414,61 +409,6 @@ static int nulink_usb_trace_read(void *handle, uint8_t *buf, size_t *size)
 	LOG_DEBUG("nulink_usb_trace_read is not supported");
 
 	return ERROR_OK;
-}
-
-static enum target_state nulink_usb_state(void *handle)
-{
-	int res;
-	struct nulink_usb_handle_s *h = handle;
-
-	if(!g_bOCDMode) {
-		nulink_mcu_reset(h, RESET_NONE2, CONNECT_ICP_MODE, EXTMODE_NORMAL);	// ICP Mode Exit
-		g_bICPMode = false;
-		nulink_mcu_reset(h, RESET_NONE_NULINK, CONNECT_NORMAL, EXTMODE_NORMAL);	//OCD Mode Entry
-		g_bOCDMode = true;
-	}
-
-	assert(handle != NULL);
-
-	//if (h->reconnect_pending) {
-	//	LOG_INFO("Previous state query failed, trying to reconnect");
-	//	res = nulink_usb_mode_enter(handle, nulink_get_mode(h->transport));
-
-	//	if (res != ERROR_OK)
-	//		return TARGET_UNKNOWN;
-
-	//	h->reconnect_pending = false;
-	//}
-
-	m_nulink_usb_api.nulink_usb_init_buffer(handle, 4 * 1);
-	/* set command ID */
-	h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_CHECK_MCU_STOP);
-	h->cmdidx += 4;
-
-	res = m_nulink_usb_api.nulink_usb_xfer(handle, h->databuf, 4 * 3);
-
-	if (res != ERROR_OK)
-		return TARGET_UNKNOWN;
-
-	if (le_to_h_u32(h->databuf) == CMD_CHECK_MCU_STOP) {
-//		LOG_DEBUG("CMD_CHECK_MCU_STOP ok");
-	}
-
-	if (le_to_h_u32(h->databuf + 4 * 2) == 0) {
-//		LOG_DEBUG("NULINK  stop_pc(0x%04x)", le_to_h_u32(h->databuf + 4 * 1));
-		m_stop_pc = le_to_h_u32(h->databuf + 4);
-		//LOG_DEBUG("nulink_usb_state: m_stop_pc(0x%x)", m_stop_pc);
-		return TARGET_HALTED;
-	}
-	else
-	{
-//		LOG_DEBUG("running");
-		return TARGET_RUNNING;
-	}
-
-	//h->reconnect_pending = true;
-
-	return TARGET_UNKNOWN;
 }
 
 static int nulink_usb_reset(void *handle)
@@ -581,6 +521,42 @@ int nulink_mcu_reset(void *handle, uint32_t reset_command, uint32_t connect_comm
 	return res;
 }
 
+static enum target_state nulink_usb_state(void *handle)
+{
+	int res;
+	struct nulink_usb_handle_s *h = handle;
+
+	if(!g_bOCDMode) {
+		nulink_mcu_reset(h, RESET_NONE2, CONNECT_ICP_MODE, EXTMODE_NORMAL);	// ICP Mode Exit
+		g_bICPMode = false;
+		nulink_mcu_reset(h, RESET_NONE_NULINK, CONNECT_NORMAL, EXTMODE_NORMAL);	//OCD Mode Entry
+		g_bOCDMode = true;
+	}
+
+	assert(handle != NULL);
+
+	m_nulink_usb_api.nulink_usb_init_buffer(handle, 4 * 1);
+	/* set command ID */
+	h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_CHECK_MCU_STOP);
+	h->cmdidx += 4;
+
+	res = m_nulink_usb_api.nulink_usb_xfer(handle, h->databuf, 4 * 3);
+
+	if (res != ERROR_OK)
+		return TARGET_UNKNOWN;
+
+	if (le_to_h_u32(h->databuf + 4 * 2) == 0) {
+		m_stop_pc = le_to_h_u32(h->databuf + 4);
+		return TARGET_HALTED;
+	}
+	else
+	{
+		return TARGET_RUNNING;
+	}
+
+	return TARGET_UNKNOWN;
+}
+
 int nulink_flash_init(void)
 {
 	int res = ERROR_OK;
@@ -625,11 +601,6 @@ int nulink_flash_uninit(void)
 		g_bICPMode = false;
 	}
 
-//	if(!g_bOCDMode) {
-//		res = nulink_mcu_reset(m_nulink_usb_handle, RESET_NONE_NULINK, CONNECT_NORMAL, EXTMODE_NORMAL);	//OCD Mode Entry
-//		g_bOCDMode = true;
-//	}
-
 	return res;
 }
 
@@ -649,7 +620,6 @@ int nulink_flash_sprom_uninit(int uSPROM_Mode)
 
 int nulink_mcu_disconnect(void)
 {
-	//LOG_DEBUG("nulink_mcu_disconnect");
 	int res;
 
 	res = nulink_mcu_reset(m_nulink_usb_handle, RESET_NONE2, CONNECT_ICP_MODE, EXTMODE_NORMAL);
@@ -666,16 +636,13 @@ int nulink_8051_read_core_regs_all(void *handle, uint32_t addr, uint32_t count, 
 	int res;
 	uint32_t i;
 	struct nulink_usb_handle_s *h = handle;
-	//LOG_DEBUG("nulink_8051_read_core_regs_all 1");
 	assert(handle != NULL);
 
 	res = nulink_usb_state(handle);
 	if(res != TARGET_HALTED)
 		return res;
 
-	//LOG_DEBUG("nulink_8051_read_core_regs_all 2");
 	m_nulink_usb_api.nulink_usb_init_buffer(handle, 4 * 3);
-	//LOG_DEBUG("nulink_8051_read_core_regs_all 3");
 	/* set command ID */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_READ_REG_ALL);
 	h->cmdidx += 4;
@@ -685,14 +652,10 @@ int nulink_8051_read_core_regs_all(void *handle, uint32_t addr, uint32_t count, 
 	/* set count */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, count);
 	h->cmdidx += 4;
-	//LOG_DEBUG("nulink_8051_read_core_regs_all 4");
 	res = m_nulink_usb_api.nulink_usb_xfer(handle, h->databuf, 4 * count);
-	//LOG_DEBUG("res: %d", res);
-	//LOG_DEBUG("nulink_8051_read_core_regs_all done");
 	if (res == ERROR_OK) {
 		for (i = 0; i < count; i++) {
 			buf[i] = le_to_h_u32(h->databuf + 4 * i);
-			//LOG_DEBUG("buf: 0x%x", buf[i]);
 		}
 	}
 
@@ -701,19 +664,15 @@ int nulink_8051_read_core_regs_all(void *handle, uint32_t addr, uint32_t count, 
 
 int nulink_set_breakpoint(void *handle, uint32_t addr, uint32_t index)
 {
-	//LOG_DEBUG("nulink_set_breakpoint");
 	int res;
 	struct nulink_usb_handle_s *h = handle;
-	//LOG_DEBUG("nulink_set_breakpoint 1");
 	assert(handle != NULL);
 
 	res = nulink_usb_state(handle);
 	if(res != TARGET_HALTED)
 		return res;
 
-	//LOG_DEBUG("nulink_set_breakpoint 2");
 	m_nulink_usb_api.nulink_usb_init_buffer(handle, 4 * 4);
-	//LOG_DEBUG("nulink_set_breakpoint 3");
 	/* set command ID */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_SET_BREAKPOINT);
 	h->cmdidx += 4;
@@ -726,29 +685,22 @@ int nulink_set_breakpoint(void *handle, uint32_t addr, uint32_t index)
 	/* set index */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, index);
 	h->cmdidx += 4;
-	//LOG_DEBUG("nulink_set_breakpoint 4");
 	res = m_nulink_usb_api.nulink_usb_xfer(handle, h->databuf, 4 * 2);
-	//LOG_DEBUG("res: %d", res);
-	//LOG_DEBUG("nulink_set_breakpoint done");
 
 	return res;
 }
 
 int nulink_clr_breakpoint(void *handle, uint32_t addr, uint32_t index)
 {
-	//LOG_DEBUG("nulink_clr_breakpoint");
 	int res;
 	struct nulink_usb_handle_s *h = handle;
-	//LOG_DEBUG("nulink_clr_breakpoint 1");
 	assert(handle != NULL);
 
 	res = nulink_usb_state(handle);
 	if(res != TARGET_HALTED)
 		return res;
 
-	//LOG_DEBUG("nulink_clr_breakpoint 2");
 	m_nulink_usb_api.nulink_usb_init_buffer(handle, 4 * 4);
-	//LOG_DEBUG("nulink_clr_breakpoint 3");
 	/* set command ID */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_CLR_BREAKPOINT);
 	h->cmdidx += 4;
@@ -761,10 +713,7 @@ int nulink_clr_breakpoint(void *handle, uint32_t addr, uint32_t index)
 	/* set index */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, index);
 	h->cmdidx += 4;
-	//LOG_DEBUG("nulink_clr_breakpoint 4");
 	res = m_nulink_usb_api.nulink_usb_xfer(handle, h->databuf, 4 * 2);
-	//LOG_DEBUG("res: %d", res);
-	//LOG_DEBUG("nulink_clr_breakpoint done");
 
 	return res;
 }
@@ -773,12 +722,9 @@ int nulink_erase_flash(uint32_t addr, uint32_t len)
 {
 	int res = ERROR_OK;
 	struct nulink_usb_handle_s *h = m_nulink_usb_handle;
-	//LOG_DEBUG("nulink_erase_flash addr:0x%x, size:0x%x", addr, len);
 	assert(m_nulink_usb_handle != NULL);
 
-	//LOG_DEBUG("nulink_erase_flash 2");
 	m_nulink_usb_api.nulink_usb_init_buffer(m_nulink_usb_handle, 4 * 3);
-	//LOG_DEBUG("nulink_erase_flash 3");
 	/* set command ID */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_ERASE_FLASH);
 	h->cmdidx += 4;
@@ -788,10 +734,7 @@ int nulink_erase_flash(uint32_t addr, uint32_t len)
 	/* set count */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, len);
 	h->cmdidx += 4;
-	//LOG_DEBUG("nulink_erase_flash 4");
 	res = m_nulink_usb_api.nulink_usb_xfer(m_nulink_usb_handle, h->databuf, 4 * 1);
-	//LOG_DEBUG("res: %d", res);
-	//LOG_DEBUG("nulink_erase_flash done");
 
 	return res;
 }
@@ -802,9 +745,8 @@ int nulink_write_flash(uint32_t addr, uint32_t len, const uint8_t *buffer)
 	struct nulink_usb_handle_s *h = m_nulink_usb_handle;
 	assert(m_nulink_usb_handle != NULL);
 
-	//LOG_DEBUG("nulink_write_flash addr:0x%x, size:0x%x", addr, len);
 	m_nulink_usb_api.nulink_usb_init_buffer(m_nulink_usb_handle, 4 * 3 + len);
-	//LOG_DEBUG("nulink_write_flash 3");
+
 	/* set command ID */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_WRITE_FLASH);
 	h->cmdidx += 4;
@@ -817,10 +759,7 @@ int nulink_write_flash(uint32_t addr, uint32_t len, const uint8_t *buffer)
 	/* set write data */
 	memcpy(h->cmdbuf + h->cmdidx, buffer, len);
 	h->cmdidx += len;
-	//LOG_DEBUG("nulink_write_flash 4");
 	res = m_nulink_usb_api.nulink_usb_xfer(m_nulink_usb_handle, h->databuf, 4 * 1);
-	//LOG_DEBUG("res: %d", res);
-	//LOG_DEBUG("nulink_write_flash done");
 
 	return res;
 }
@@ -831,9 +770,7 @@ int nulink_read_flash(uint32_t addr, uint32_t len, uint8_t *buffer)
 	struct nulink_usb_handle_s *h = m_nulink_usb_handle;
 	assert(m_nulink_usb_handle != NULL);
 
-	//LOG_DEBUG("nulink_read_flash 2");
 	m_nulink_usb_api.nulink_usb_init_buffer(m_nulink_usb_handle, 4 * 3);
-	//LOG_DEBUG("nulink_read_flash 3");
 	/* set command ID */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_READ_FLASH);
 	h->cmdidx += 4;
@@ -843,21 +780,15 @@ int nulink_read_flash(uint32_t addr, uint32_t len, uint8_t *buffer)
 	/* set count */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, len);
 	h->cmdidx += 4;
-	//LOG_DEBUG("nulink_read_flash 4");
 	res = m_nulink_usb_api.nulink_usb_xfer(m_nulink_usb_handle, h->databuf, len);
-	//LOG_DEBUG("res: %d", res);
-	//LOG_DEBUG("nulink_read_flash done");
 	if (res == ERROR_OK) {
 		memcpy(buffer, h->databuf, len);
-//		for (i = 0; i < len; i++) {
-//			LOG_DEBUG("buf: 0x%x", buffer[i]);
-//		}
 	}
 
 	return res;
 }
 
-int nulink_set_flash_mode()
+int nulink_set_flash_mode(void)
 {
 	int res = ERROR_OK;
 	struct nulink_usb_handle_s *h = m_nulink_usb_handle;
@@ -910,73 +841,10 @@ int nulink_usb_chip_erase(void)
 	return res;	
 }
 
-int nulink_usb_M2351_erase(void)
-{
-	int res = ERROR_FAIL;
-	struct nulink_usb_handle_s *h = m_nulink_usb_handle;
-
-//	LOG_DEBUG("nulink_usb_M2351_erase");
-
-	if (m_nulink_usb_handle != NULL) {
-		// SET_CONFIG for M2351
-		m_nulink_usb_api.nulink_usb_init_buffer(m_nulink_usb_handle, 4 * 6);
-		/* set command ID */
-		h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_SET_CONFIG);
-		h->cmdidx += 4;
-		/* set max SWD clock */
-		h_u32_to_le(h->cmdbuf + h->cmdidx, 1000);
-		h->cmdidx += 4;
-		/* chip type: NUC_CHIP_TYPE_M2351 */
-		h_u32_to_le(h->cmdbuf + h->cmdidx, 0x321);
-		h->cmdidx += 4;
-		/* IO voltage */
-		h_u32_to_le(h->cmdbuf + h->cmdidx, 5000);
-		h->cmdidx += 4;
-		/* If supply voltage to target or not */
-		h_u32_to_le(h->cmdbuf + h->cmdidx, 0);
-		h->cmdidx += 4;
-		/* USB_FUNC_E: USB_FUNC_HID_BULK */
-		h_u32_to_le(h->cmdbuf + h->cmdidx, 2);
-		h->cmdidx += 4;
-
-		m_nulink_usb_api.nulink_usb_xfer(m_nulink_usb_handle, h->databuf, 4 * 3);
-
-		// Erase whole chip
-		m_nulink_usb_api.nulink_usb_init_buffer(m_nulink_usb_handle, 4 * 6);
-		/* set command ID */
-		h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_ERASE_FLASHCHIP);
-		h->cmdidx += 4;
-		/* set count */
-		h_u32_to_le(h->cmdbuf + h->cmdidx, 0);
-		h->cmdidx += 4;
-		/* set config 0 */
-		h_u32_to_le(h->cmdbuf + h->cmdidx, 0xFFFFFFFF);
-		h->cmdidx += 4;
-		/* set config 1 */
-		h_u32_to_le(h->cmdbuf + h->cmdidx, 0xFFFFFFFF);
-		h->cmdidx += 4;
-		/* set config 2 */
-		h_u32_to_le(h->cmdbuf + h->cmdidx, 0xFFFFFFFF);
-		h->cmdidx += 4;
-		/* set config 3 */
-		h_u32_to_le(h->cmdbuf + h->cmdidx, 0xFFFFFFFF);
-		h->cmdidx += 4;
-
-		res = m_nulink_usb_api.nulink_usb_xfer(m_nulink_usb_handle, h->databuf, 4 * 1);
-	}
-	else {
-		LOG_DEBUG("m_nulink_usb_handle not found");
-	}
-
-	return res;
-}
-
 int nulink_usb_assert_reset(void)
 {
 	int res;
 	struct nulink_usb_handle_s *h = m_nulink_usb_handle;
-
-	//LOG_DEBUG("nulink_usb_assert_reset");
 
 	m_nulink_usb_api.nulink_usb_init_buffer(m_nulink_usb_handle, 4 * 4);
 	/* set command ID */
@@ -1009,8 +877,6 @@ static int nulink_usb_idcode(void *handle, uint32_t *idcode)
 		nulink_mcu_reset(h, RESET_NONE_NULINK, CONNECT_ICP_MODE, EXTMODE_NORMAL);	//ICP Mode Entry
 	}
 
-	//LOG_DEBUG("nulink_usb_idcode");
-
 	assert(handle != NULL);
 
 	m_nulink_usb_api.nulink_usb_init_buffer(handle, 4 * 2);
@@ -1020,11 +886,9 @@ static int nulink_usb_idcode(void *handle, uint32_t *idcode)
 	h->cmdidx += 4;
 	/* set index */
 	if (*idcode == 2) {
-//		LOG_DEBUG("nulink_usb_idcode 2");
 		h_u32_to_le(h->cmdbuf + h->cmdidx, 2);
 	}
 	else {
-//		LOG_DEBUG("nulink_usb_idcode 0");
 		h_u32_to_le(h->cmdbuf + h->cmdidx, 0);
 	}
 	h->cmdidx += 4;
@@ -1044,8 +908,6 @@ static int nulink_usb_run(void *handle)
 {
 	int res;
 	struct nulink_usb_handle_s *h = handle;
-
-	//LOG_DEBUG("nulink_usb_run");
 
 	assert(handle != NULL);
 
@@ -1071,8 +933,6 @@ static int nulink_usb_halt(void *handle)
 		g_bOCDMode = true;
 	}
 
-//	LOG_DEBUG("nulink_usb_halt");
-
 	assert(handle != NULL);
 
 	m_nulink_usb_api.nulink_usb_init_buffer(handle, 4 * 1);
@@ -1081,9 +941,6 @@ static int nulink_usb_halt(void *handle)
 	h->cmdidx += 4;
 
 	res = m_nulink_usb_api.nulink_usb_xfer(handle, h->databuf, 4 * 2);
-	//LOG_DEBUG("nulink_usb_halt res: %d", res);
-//	LOG_DEBUG("NULINK  stop_pc(0x%04x)",
-//	le_to_h_u32(h->databuf + 4));
 	m_stop_pc = le_to_h_u32(h->databuf + 4);
 	LOG_DEBUG("nulink_usb_halt: m_stop_pc(0x%x)", m_stop_pc);
 
@@ -1092,12 +949,8 @@ static int nulink_usb_halt(void *handle)
 
 int nulink_8051_reset(void *handle)
 {
-//	LOG_DEBUG("nulink_8051_reset");
 	int res;
 
-//	res = nulink_mcu_reset(m_nulink_usb_handle, RESET_AUTO, CONNECT_ICP_MODE, EXTMODE_NORMAL);	//Mode Exit
-//	if(res != ERROR_OK)
-//		return res;
 	if(!g_bOCDMode) {
 		nulink_mcu_reset(m_nulink_usb_handle, RESET_NONE2, CONNECT_ICP_MODE, EXTMODE_NORMAL);	// ICP Mode Exit
 		g_bICPMode = false;
@@ -1125,7 +978,6 @@ int nulink_8051_reset(void *handle)
 static int nulink_usb_assert_srst(void *handle, int srst)
 {
 	int res;
-	//LOG_DEBUG("nulink_usb_assert_srst");
 	res = nulink_8051_reset(handle);
 	return res;
 }
@@ -1134,8 +986,6 @@ static int nulink_usb_step(void *handle)
 {
 	int res;
 	struct nulink_usb_handle_s *h = handle;
-
-//	LOG_DEBUG("nulink_usb_step");
 
 	assert(handle != NULL);
 
@@ -1146,9 +996,6 @@ static int nulink_usb_step(void *handle)
 
 	res = m_nulink_usb_api.nulink_usb_xfer(handle, h->databuf, 4 * 2);
 
-//	LOG_DEBUG("NULINK pc(0x%04x)",
-//		le_to_h_u32(h->databuf + 4));
-	
 	m_stop_pc = le_to_h_u32(h->databuf + 4);
 	LOG_DEBUG("nulink_usb_step: m_stop_pc(0x%x)", m_stop_pc);
 
@@ -1157,7 +1004,6 @@ static int nulink_usb_step(void *handle)
 
 static int nulink_usb_read_regs(void *handle)
 {
-	//LOG_DEBUG("nulink_usb_read_regs");
 	return ERROR_OK;
 }
 
@@ -1165,8 +1011,6 @@ static int nulink_usb_read_reg(void *handle, int num, uint32_t *val)
 {
 	int res;
 	struct nulink_usb_handle_s *h = handle;
-
-	//LOG_DEBUG("nulink_usb_read_reg");
 
 	assert(handle != NULL);
 
@@ -1200,10 +1044,6 @@ static int nulink_usb_read_reg(void *handle, int num, uint32_t *val)
 
 	*val = le_to_h_u32(h->databuf + 4 * 1);
 
-	//LOG_DEBUG("NULINK read_reg(%d): 0x%08x",
-	//	num,
-	//	le_to_h_u32(h->databuf + 4 * 1));
-
 	return res;
 }
 
@@ -1211,8 +1051,6 @@ static int nulink_usb_write_reg(void *handle, int num, uint32_t val)
 {
 	int res;
 	struct nulink_usb_handle_s *h = handle;
-
-	//LOG_DEBUG("nulink_usb_write_reg");
 
 	assert(handle != NULL);
 
@@ -1244,10 +1082,6 @@ static int nulink_usb_write_reg(void *handle, int num, uint32_t val)
 
 	res = m_nulink_usb_api.nulink_usb_xfer(handle, h->databuf, 4 * 2);
 
-	//LOG_DEBUG("NULINK write_reg(%d): %d",
-	//	num,
-	//	val);
-
 	return res;
 }
 
@@ -1260,8 +1094,6 @@ static int nulink_usb_read_mem8(void *handle, uint32_t addr, uint16_t len,
 	uint32_t bytes_remaining = 4;
 	struct nulink_usb_handle_s *h = handle;
 
-	//LOG_DEBUG("nulink_usb_read_mem8: addr(0x%08x), len(%d)", addr, len);
-
 	assert(handle != NULL);
 
 	/* check whether data is word aligned */
@@ -1269,7 +1101,6 @@ static int nulink_usb_read_mem8(void *handle, uint32_t addr, uint16_t len,
 		alignedAddr = addr / 4;
 		alignedAddr = alignedAddr * 4;
 		offset = addr - alignedAddr;
-		//LOG_DEBUG("nulink_usb_read_mem8: address dose not follow alignment. addr(0x%08x)/alignedAddr(0x%08x)/offset(%d)", addr, alignedAddr, offset);
 
 		addr = alignedAddr;
 	}
@@ -1324,10 +1155,6 @@ static int nulink_usb_read_mem8(void *handle, uint32_t addr, uint16_t len,
 				memcpy(buffer + 2 * 1, h->databuf + 4 * (2 * 1 + 1), len - 2);
 		}
 
-		// LOG_DEBUG("NULINK read_ram8(0x%08x): 0x%08x",
-			// addr - 4,
-			// le_to_h_u32(buffer));
-
 		if (len >= bytes_remaining)
 			len -= bytes_remaining;
 		else
@@ -1347,8 +1174,6 @@ static int nulink_usb_write_mem8(void *handle, uint32_t addr, uint16_t len,
 	uint32_t u32bufferData;
 	struct nulink_usb_handle_s *h = handle;
 
-	//LOG_DEBUG("nulink_usb_write_mem8: addr(0x%08x), len(%d)", addr, len);
-
 	assert(handle != NULL);
 
 	/* check whether data is word aligned */
@@ -1356,7 +1181,6 @@ static int nulink_usb_write_mem8(void *handle, uint32_t addr, uint16_t len,
 		alignedAddr = addr / 4;
 		alignedAddr = alignedAddr * 4;
 		offset = addr - alignedAddr;
-		//LOG_DEBUG("nulink_usb_write_mem8: address dose not follow alignment. addr(0x%08x)/alignedAddr(0x%08x)/offset(%d)", addr, alignedAddr, offset);
 
 		addr = alignedAddr;
 	}
@@ -1401,45 +1225,36 @@ static int nulink_usb_write_mem8(void *handle, uint32_t addr, uint16_t len,
 				if (offset == 0) {
 					if (len == 1) {
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0xFFFFFF00);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0xFFFFFF00", i);
 					}
 					else if (len == 2) {
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0xFFFF0000);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0xFFFF0000", i);
 					}
 					else { // len == 3
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0xFF000000);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0xFF000000", i);
 					}
 				}
 				else if (offset == 1) {
 					if (len == 1) {
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0xFFFF00FF);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0xFFFF00FF", i);
 					}
 					else if (len == 2) {
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0xFF0000FF);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0xFF0000FF", i);
 					}
 					else { // len == 3
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0x000000FF);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0x000000FF", i);
 					}
 				}
 				else if (offset == 2) {
 					if (len == 1) {
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0xFF00FFFF);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0xFF00FFFF", i);
 					}
 					else { // len == 2
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0x0000FFFF);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0x0000FFFF", i);
 					}
 				}
 				else { // offset == 3
 					if (len == 1) {
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0x00FFFFFF);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0x00FFFFFF", i);
 					}
 				}
 			}
@@ -1447,38 +1262,28 @@ static int nulink_usb_write_mem8(void *handle, uint32_t addr, uint16_t len,
 				if (offset == 1) {
 					// len == 4
 					h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0xFFFFFF00);
-					//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0xFFFFFF00", i);
 				}
 				else if (offset == 2) {
 					if (len == 3) {
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0xFFFFFF00);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0xFFFFFF00", i);
 					}
 					else { // len == 4
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0xFFFF0000);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0xFFFF0000", i);
 					}
 				}
 				else { // offset == 3
 					if (len == 2) {
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0xFFFFFF00);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0xFFFFFF00", i);
 					}
 					else if (len == 3) {
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0xFFFF0000);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0xFFFF0000", i);
 					}
 					else { // len == 4
 						h_u32_to_le(h->cmdbuf + h->cmdidx, (unsigned long)0xFF000000);
-						//LOG_DEBUG("nulink_usb_write_mem8: count(%d), mask: 0xFF000000", i);
 					}
 				}
 			}
 			h->cmdidx += 4;
-
-			// LOG_DEBUG("NULINK write_ram8(0x%08x): 0x%04x",
-				// addr,
-				// u32bufferData);
 
 			/* proceed to the next one */
 			addr += 4;
@@ -1499,20 +1304,15 @@ static int nulink_usb_write_mem8(void *handle, uint32_t addr, uint16_t len,
 static int nulink_usb_read_mem32(void *handle, uint32_t addr, uint32_t len,
 			  uint8_t *buffer)
 {
-	//LOG_DEBUG("nulink_usb_read_mem32");
 	int res = ERROR_OK;
-	uint32_t i;
 	struct nulink_usb_handle_s *h = handle;
-	//LOG_DEBUG("nulink_usb_read_mem32 1");
 	assert(handle != NULL);
 
 	res = nulink_usb_state(handle);
 	if(res != TARGET_HALTED)
 		return res;
 
-	//LOG_DEBUG("nulink_usb_read_mem32 2");
 	m_nulink_usb_api.nulink_usb_init_buffer(handle, 4 * 3);
-	//LOG_DEBUG("nulink_usb_read_mem32 3");
 	/* set command ID */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_READ_BLOCK);
 	h->cmdidx += 4;
@@ -1522,15 +1322,9 @@ static int nulink_usb_read_mem32(void *handle, uint32_t addr, uint32_t len,
 	/* set count */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, len);
 	h->cmdidx += 4;
-	//LOG_DEBUG("nulink_usb_read_mem32 4");
 	res = m_nulink_usb_api.nulink_usb_xfer(handle, h->databuf, len);
-	//LOG_DEBUG("res: %d", res);
-	//LOG_DEBUG("nulink_usb_read_mem32 done");
 	if (res == ERROR_OK) {
 		memcpy(buffer, h->databuf, len);
-		for (i = 0; i < len; i++) {
-			//LOG_DEBUG("buf: 0x%x", buffer[i]);
-		}
 	}
 
 	return res;
@@ -1539,19 +1333,15 @@ static int nulink_usb_read_mem32(void *handle, uint32_t addr, uint32_t len,
 static int nulink_usb_write_mem32(void *handle, uint32_t addr, uint16_t len,
 	const uint8_t *buffer)
 {
-	//LOG_DEBUG("nulink_usb_write_mem32");
 	int res = ERROR_OK;
 	struct nulink_usb_handle_s *h = handle;
-	//LOG_DEBUG("nulink_usb_write_mem32 1");
 	assert(handle != NULL);
 
 	res = nulink_usb_state(handle);
 	if(res != TARGET_HALTED)
 		return res;
 
-	//LOG_DEBUG("nulink_usb_write_mem32 2");
 	m_nulink_usb_api.nulink_usb_init_buffer(handle, 4 * 3 + len);
-	//LOG_DEBUG("nulink_usb_write_mem32 3");
 	/* set command ID */
 	h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_WRITE_BLOCK);
 	h->cmdidx += 4;
@@ -1564,10 +1354,7 @@ static int nulink_usb_write_mem32(void *handle, uint32_t addr, uint16_t len,
 	/* set write data */
 	memcpy(h->cmdbuf + h->cmdidx, buffer, len);
 	h->cmdidx += len;
-	//LOG_DEBUG("nulink_usb_write_mem32 4");
 	res = m_nulink_usb_api.nulink_usb_xfer(handle, h->databuf, 4 * 1);
-	//LOG_DEBUG("res: %d", res);
-	//LOG_DEBUG("nulink_usb_write_mem32 done");
 
 	return res;
 }
@@ -1579,29 +1366,21 @@ static uint32_t nulink_max_block_size(uint32_t tar_autoincr_block, uint32_t addr
 	if (max_tar_block == 0)
 		max_tar_block = 4;
 
-	//LOG_DEBUG("nulink_max_block_size: %d", max_tar_block);
-
 	return max_tar_block;
 }
 
 static int nulink_usb_read_mem(void *handle, uint32_t addr, uint32_t size,
 		uint32_t count, uint8_t *buffer)
 {
-//	LOG_DEBUG("nulink_usb_read_mem");
-
 	int retval = ERROR_OK;
 	uint32_t bytes_remaining;
 	struct nulink_usb_handle_s *h = handle;
-
-	//LOG_DEBUG("nulink_usb_read_mem: addr(%04x), size(%d), count(%d)", addr, size, count);
 
 	/* calculate byte count */
 	count *= size;
 
 	while (count) {
-		//LOG_DEBUG("count %d", count);
-		bytes_remaining = MAX_READ_BLOCK(h->max_mem_packet);//nulink_max_block_size(h->max_mem_packet, addr);
-		//LOG_DEBUG("bytes_remaining %d", bytes_remaining);
+		bytes_remaining = MAX_READ_BLOCK(h->max_mem_packet);
 
 		if (count < bytes_remaining)
 			bytes_remaining = count;
@@ -1609,54 +1388,10 @@ static int nulink_usb_read_mem(void *handle, uint32_t addr, uint32_t size,
 		if (bytes_remaining >= 4)
 			size = 4;
 
-		/* the nulink only supports 8/32bit memory read/writes
-		 * honour 32bit, all others will be handled as 8bit access */
-		if (0) {//size == 4) {
-
-			/* When in jtag mode the nulink uses the auto-increment functinality.
-			 * However it expects us to pass the data correctly, this includes
-			 * alignment and any page boundaries. We already do this as part of the
-			 * adi_v5 implementation, but the nulink is a hla adapter and so this
-			 * needs implementiong manually.
-			 * currently this only affects jtag mode, they do single
-			 * access in SWD mode - but this may change and so we do it for both modes */
-
-			/* we first need to check for any unaligned bytes */
-			if (addr % 4) {
-				uint32_t head_bytes = 4 - (addr % 4);
-				//LOG_DEBUG("nulink_usb_read_mem8 b");
-				retval = nulink_usb_read_mem8(handle, addr, head_bytes, buffer);
-				//LOG_DEBUG("nulink_usb_read_mem8 a");
-				if (retval != ERROR_OK)
-					return retval;
-				buffer += head_bytes;
-				addr += head_bytes;
-				count -= head_bytes;
-				bytes_remaining -= head_bytes;
-			}
-
-			if (bytes_remaining % 4)
-			{
-				//LOG_DEBUG("nulink_usb_read_mem b");
-				retval = nulink_usb_read_mem(handle, addr, 1, bytes_remaining, buffer);
-				//LOG_DEBUG("nulink_usb_read_mem a");
-			}
-			else
-			{
-				//LOG_DEBUG("nulink_usb_read_mem32 b");
-				retval = nulink_usb_read_mem32(handle, addr, bytes_remaining, buffer);
-				//LOG_DEBUG("nulink_usb_read_mem32 a");
-			}
-		} else
-		{
-			//LOG_DEBUG("nulink_usb_read_mem8 b2");
-			retval = nulink_usb_read_mem32(handle, addr, bytes_remaining, buffer);
-			//LOG_DEBUG("nulink_usb_read_mem8 a2");
-		}
+		retval = nulink_usb_read_mem32(handle, addr, bytes_remaining, buffer);
 
 		if (retval != ERROR_OK)
 		{
-			//LOG_DEBUG("retval: -1");
 			return retval;
 		}
 
@@ -1664,30 +1399,15 @@ static int nulink_usb_read_mem(void *handle, uint32_t addr, uint32_t size,
 		addr += bytes_remaining;
 		count -= bytes_remaining;
 	}
-	//LOG_DEBUG("retval: %d", retval);
 	return retval;
 }
 
 static int nulink_usb_write_mem(void *handle, uint32_t addr, uint32_t size,
 		uint32_t count, const uint8_t *buffer)
 {
-	//LOG_DEBUG("nulink_usb_write_mem");
-
 	int retval = ERROR_OK;
 	uint32_t bytes_remaining;
 	struct nulink_usb_handle_s *h = handle;
-
-	//LOG_DEBUG("nulink_usb_read_mem: addr(%04x), size(%d), count(%d)", addr, size, count);
-
-//	if (addr < ARM_SRAM_BASE) {
-//		if (strcmp(m_target_name, "NUC505") != 0) {
-//			LOG_DEBUG("since the address is below ARM_SRAM_BASE, the Nuvoton %s chip does not support this kind of writing.", m_target_name);
-//			return retval;
-//		}
-//		else {
-//			LOG_DEBUG("although the address is below ARM_SRAM_BASE, the Nuvoton %s chip supports this kind of writing.", m_target_name);
-//		}
-//	}
 
 	/* calculate byte count */
 	count *= size;
@@ -1703,38 +1423,7 @@ static int nulink_usb_write_mem(void *handle, uint32_t addr, uint32_t size,
 
 		/* the nulink only supports 8/32bit memory read/writes
 		 * honour 32bit, all others will be handled as 8bit access */
-		if (0) {//size == 4) {
-
-			/* When in jtag mode the nulink uses the auto-increment functinality.
-			 * However it expects us to pass the data correctly, this includes
-			 * alignment and any page boundaries. We already do this as part of the
-			 * adi_v5 implementation, but the nulink is a hla adapter and so this
-			 * needs implementiong manually.
-			 * currently this only affects jtag mode, do single
-			 * access in SWD mode - but this may change and so we do it for both modes */
-
-			/* we first need to check for any unaligned bytes */
-			if (addr % 4) {
-				uint32_t head_bytes = 4 - (addr % 4);
-				retval = nulink_usb_write_mem8(handle, addr, head_bytes, buffer);
-				if (retval != ERROR_OK)
-					return retval;
-				buffer += head_bytes;
-				addr += head_bytes;
-				count -= head_bytes;
-				bytes_remaining -= head_bytes;
-			}
-
-			if (bytes_remaining % 4)
-				retval = nulink_usb_write_mem(handle, addr, 1, bytes_remaining, buffer);
-			else {
-				//LOG_DEBUG("nulink_usb_write_mem32 1");
-				retval = nulink_usb_write_mem32(handle, addr, bytes_remaining, buffer);
-				//LOG_DEBUG("nulink_usb_write_mem32 2");
-			}
-
-		} else
-			retval = nulink_usb_write_mem32(handle, addr, bytes_remaining, buffer);
+		retval = nulink_usb_write_mem32(handle, addr, bytes_remaining, buffer);
 
 		if (retval != ERROR_OK)
 			return retval;
@@ -1749,8 +1438,6 @@ static int nulink_usb_write_mem(void *handle, uint32_t addr, uint32_t size,
 
 static int nulink_usb_override_target(const char *targetname)
 {
-	//LOG_DEBUG("nulink_usb_override_target");
-
 	return !strcmp(targetname, "cortex_m");
 }
 
@@ -1822,36 +1509,10 @@ static int nulink_speed(void *handle, int khz, bool query)
 
 static int nulink_usb_close(void *handle)
 {
-
-	//LOG_DEBUG("nulink_usb_close");
-
 	if (handle != NULL) {
 		nulink_mcu_reset(handle, RESET_NONE2, CONNECT_NORMAL, EXTMODE_NORMAL);
 		nulink_mcu_reset(handle, RESET_AUTO, CONNECT_DISCONNECT, EXTMODE_NORMAL);
 	}
-//	if (handle != NULL) {
-//		LOG_DEBUG("trying to disconnect with nulink");
-//		m_nulink_usb_api.nulink_usb_init_buffer(handle, 4 * 4);
-//		/* set command ID */
-//		h_u32_to_le(h->cmdbuf + h->cmdidx, CMD_MCU_RESET);
-//		h->cmdidx += 4;
-//		/* set reset type */
-//		h_u32_to_le(h->cmdbuf + h->cmdidx, RESET_NONE_NULINK);
-//		h->cmdidx += 4;
-//		/* set connect type */
-//		h_u32_to_le(h->cmdbuf + h->cmdidx, CONNECT_DISCONNECT);
-//		h->cmdidx += 4;
-//		/* set extMode */
-//		h_u32_to_le(h->cmdbuf + h->cmdidx, EXTMODE_8051OT_1);
-//		h->cmdidx += 4;
-//
-//		m_nulink_usb_api.nulink_usb_xfer(handle, h->databuf, 4 * 1);
-//	}
-
-	// if (h && h->fd)
-		// jtag_libusb_close(h->fd);
-
-	// free(h);
 
 	return ERROR_OK;
 }
@@ -1867,60 +1528,6 @@ static int nulink_usb_open(struct hl_interface_param_s *param, void **fd)
 	m_nulink_usb_handle = NULL;
 	g_bOCDMode = false;
 
-//	struct stat fileStat;
-//	err = stat("c:\\Program Files\\Nuvoton Tools\\OpenOCD\\bin\\NuLink.exe", &fileStat);
-//	LOG_DEBUG("Stat Case 1: %d", err);
-//	if(err >= 0) {
-//		sprintf(buf, "\"c:\\Program Files\\Nuvoton Tools\\OpenOCD\\bin\\NuLink.exe\" -o conflict");
-//		result = system(buf);
-//		LOG_DEBUG("Run NuLink.exe on Win32 (result: %d)", result);
-//		if (result == -46) {
-//			LOG_DEBUG("A conflict happened! (result: %d)", result);
-//			LOG_ERROR("The ICE has been used by another Nuvoton tool. OpenOCD cannot work with the ICE unless we close the connection between the ICE and Nuvoton tool.");
-//			return ERROR_FAIL;
-//		}
-//		else if (result == -6) {
-//			LOG_DEBUG("Cannot find a target chip! (result: %d)", result);
-//			LOG_ERROR("We cannot find any Nuvoton device. Please check the hardware connection.");
-//			LOG_ERROR("If the ICE is used by another Nuvoton tool, please close the connection between the ICE and Nuvoton tool.");
-//			return ERROR_FAIL;
-//		}
-//		else if (result == 0) {
-//			sprintf(buf, "start /b \"\" \"c:\\Program Files\\Nuvoton Tools\\OpenOCD\\bin\\NuLink.exe\" -o wait");
-//			result = system(buf);
-//			busy_sleep(500);
-//			LOG_DEBUG("Wait NuLink.exe (result: %d)", result);
-//		}
-//	}
-//	else {
-//		err = stat("c:\\Program Files (x86)\\Nuvoton Tools\\OpenOCD\\bin\\NuLink.exe", &fileStat);
-//		LOG_DEBUG("Stat Case 2: %d", err);
-//		if(err >= 0) {
-//			sprintf(buf, "\"c:\\Program Files (x86)\\Nuvoton Tools\\OpenOCD\\bin\\NuLink.exe\" -o conflict");
-//			result = system(buf);
-//			LOG_DEBUG("Run NuLink.exe on Win64 (result: %d)", result);
-//			if (result == -46) {
-//				LOG_DEBUG("A conflict happened! (result: %d)", result);
-//				LOG_ERROR("The ICE has been used by another Nuvoton Tool. OpenOCD cannot work with the ICE unless we close the connection between the ICE and Nuvoton tool.");
-//				return ERROR_FAIL;
-//			}
-//			else if (result == -6) {
-//				LOG_DEBUG("Cannot find a target chip! (result: %d)", result);
-//				LOG_ERROR("We cannot find any Nuvoton device. Please check the hardware connection.");
-//				LOG_ERROR("If the ICE is used by another Nuvoton tool, please close the connection between the ICE and Nuvoton tool.");
-//				return ERROR_FAIL;
-//			}
-//			else if (result == 0) {
-//				sprintf(buf, "start /b \"\" \"c:\\Program Files (x86)\\Nuvoton Tools\\OpenOCD\\bin\\NuLink.exe\" -o wait");
-//				result = system(buf);
-//				busy_sleep(500);
-//				LOG_DEBUG("Wait NuLink.exe (result: %d)", result);
-//			}
-//		}
-//		else {
-//			LOG_DEBUG("Skip running NuLink.exe");
-//		}
-//	}
 	h = calloc(1, sizeof(struct nulink_usb_handle_s));
 
 	if (h == 0) {
@@ -1948,9 +1555,7 @@ static int nulink_usb_open(struct hl_interface_param_s *param, void **fd)
 		m_nulink_usb_api.nulink_usb_xfer = nulink2_usb_xfer;
 		m_nulink_usb_api.nulink_usb_init_buffer = nulink2_usb_init_buffer;
 		h->interface_num = NULINK2_INTERFACE_NUM;
-//		h->rx_ep = NULINK2_RX_EP;
-//		h->tx_ep = NULINK2_TX_EP;
-		h->max_packet_size = jtag_libusb_get_maxPacketSize(h->fd, 0, h->interface_num, &h->rx_ep, &h->tx_ep);
+		h->max_packet_size = jtag_libusb_get_maxPacketSize(h->fd, 0, h->interface_num, (unsigned int *)&h->rx_ep, (unsigned int *)&h->tx_ep);
 		if (h->max_packet_size == (uint16_t)-1) {
 			h->max_packet_size = NULINK2_HID_MAX_SIZE * 4 / 4;
 		}
@@ -1968,9 +1573,7 @@ static int nulink_usb_open(struct hl_interface_param_s *param, void **fd)
 		m_nulink_usb_api.nulink_usb_xfer = nulink_usb_xfer;
 		m_nulink_usb_api.nulink_usb_init_buffer = nulink_usb_init_buffer;
 		h->interface_num = NULINK_INTERFACE_NUM;
-//		h->rx_ep = NULINK_RX_EP;
-//		h->tx_ep = NULINK_TX_EP;
-		h->max_packet_size = jtag_libusb_get_maxPacketSize(h->fd, 0, h->interface_num, &h->rx_ep, &h->tx_ep);
+		h->max_packet_size = jtag_libusb_get_maxPacketSize(h->fd, 0, h->interface_num, (unsigned int *)&h->rx_ep, (unsigned int *)&h->tx_ep);
 		if (h->max_packet_size == (uint16_t)-1) {
 			h->max_packet_size = NULINK_HID_MAX_SIZE;
 		}
@@ -1983,7 +1586,6 @@ static int nulink_usb_open(struct hl_interface_param_s *param, void **fd)
 	err = jtag_libusb_detach_kernel_driver(h->fd, h->interface_num);
 	if (err != ERROR_OK) {
 		LOG_DEBUG("detach kernel driver failed(%d)", err);
-		//goto error_open;
 	}
 	else {
 		LOG_DEBUG("jtag_libusb_detach_kernel_driver succeeded");
@@ -2037,12 +1639,10 @@ static int nulink_usb_open(struct hl_interface_param_s *param, void **fd)
 	LOG_DEBUG("nulink_usb_open: we manually perform nulink_usb_reset");
 	err = nulink_mcu_reset(h, RESET_AUTO, CONNECT_ICP_MODE, EXTMODE_NORMAL);	//Mode Entry
 	if (err != ERROR_OK) {
-		//LOG_DEBUG("nulink_mcu_reset");
 		return err;
 	}
 	err = nulink_mcu_reset(h, RESET_NONE_NULINK, CONNECT_ICP_MODE, EXTMODE_NORMAL);	//ICP Mode Entry
 	if (err != ERROR_OK) {
-		//LOG_DEBUG("nulink_mcu_reset2");
 		return err;
 	}
 	err = nulink_usb_idcode(h, &nulink_idcode);
@@ -2072,36 +1672,12 @@ static int nulink_usb_open(struct hl_interface_param_s *param, void **fd)
 
 	err = nulink_usb_halt(h);
 	if (err != ERROR_OK) {
-		//LOG_DEBUG("nulink_usb_halt");
 		return err;
 	}
-//	h->max_mem_packet = (1 << 10);
-
-//	uint8_t buffer[4];
-//	err = nulink_usb_read_mem32(h, CPUID, 4, buffer);
-//	if (err == ERROR_OK) {
-//		uint32_t cpuid = le_to_h_u32(buffer);
-//		int i;
-//
-//		if (((cpuid >> 4) & 0xfff) == V8MBL_CPUID_PARTNO || ((cpuid >> 4) & 0xfff) == V8MML_CPUID_PARTNO) {
-//			i = 23;
-//		}
-//		else {
-//			i = (cpuid >> 4) & 0xf;
-//		}
-//
-//		if (i == 4 || i == 3 || i == 23) {
-//			/* Cortex-M3/M4/M23 has 4096 bytes autoincrement range */
-//			h->max_mem_packet = (1 << 12);
-//		}
-//	}
-//
-//	LOG_DEBUG("max page size: %" PRIu32, h->max_mem_packet);
 
 	return ERROR_OK;
 
 error_open:
-	//nulink_usb_close(h);
 
 	if (h && h->fd)
 		jtag_libusb_close(h->fd);
@@ -2114,9 +1690,6 @@ error_open:
 int nulink_config_trace(void *handle, bool enabled, enum tpio_pin_protocol pin_protocol,
 			uint32_t port_size, unsigned int *trace_freq)
 {
-	/* not supported */
-	//LOG_DEBUG("nulink_config_trace");
-
 	return ERROR_OK;
 }
 
@@ -2130,7 +1703,7 @@ struct hl_layout_api_s nulink_usb_layout_api = {
 
 	.state = nulink_usb_state,
 
-	.reset = nulink_8051_reset,//nulink_usb_reset,
+	.reset = nulink_8051_reset,
 
 	.assert_srst = nulink_usb_assert_srst,
 

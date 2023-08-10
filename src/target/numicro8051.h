@@ -83,11 +83,12 @@ struct numicro8051_common {
 extern int nulink_erase_flash(uint32_t addr, uint32_t len);
 extern int nulink_write_flash(uint32_t addr, uint32_t len, const uint8_t *buffer);
 extern int nulink_read_flash(uint32_t addr, uint32_t len, uint8_t *buffer);
-int nulink_set_flash_mode();
-extern int nulink_mcu_disconnect();
-extern int nulink_flash_init();
-extern int nulink_flash_sprom_init();
-extern int nulink_flash_uninit();
+extern int nulink_usb_chip_erase(void);
+extern int nulink_set_flash_mode(void);
+extern int nulink_mcu_disconnect(void);
+extern int nulink_flash_init(void);
+extern int nulink_flash_sprom_init(void);
+extern int nulink_flash_uninit(void);
 extern int nulink_flash_sprom_uninit(int uSPROM_Mode);
 extern int nulink_8051_reset(void *handle);
 
