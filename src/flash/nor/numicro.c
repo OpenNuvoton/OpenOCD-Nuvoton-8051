@@ -782,7 +782,7 @@ static int numicro_erase(struct flash_bank *bank, int first, int last)
 	}
 	else {
 		if (!g_bErase) {
-			retval = nulink_erase_flash(numicro8051->uProgramFlashAddr, numicro8051->uProgramFlashSize);
+			retval = nulink_erase_flash(first * bank->sectors[0].size, (last - first + 1) * bank->sectors[0].size);
 			g_bErase = true;
 		}
 	}
