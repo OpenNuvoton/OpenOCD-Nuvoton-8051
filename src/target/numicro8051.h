@@ -37,9 +37,12 @@ struct target;
 #define REG_PSW				0xD0
 #define REG_ACC				0xE0
 #define REG_B				0xF0
-#define amDATA   0x00F0           // DATA
-#define amIDATA  0x00F1           // IDATA
-#define amXDATA  0x00F2           // XDATA
+#define amDATA    0x0010           // DATA
+#define amDATA1   0x0011           // DATA1
+#define amDATA2   0x0012           // DATA2
+#define amDATA3   0x0013           // DATA3
+#define amIDATA  0x0021           // IDATA
+#define amXDATA  0x0031           // XDATA
 #define amCODE   0x0000           // CODE 
 
 struct numicro8051_common {

@@ -1134,45 +1134,54 @@ int numicro8051_read_memory(struct target *target, uint32_t address,
 {
 	int retval;
 	unsigned long uZone, uAddr, uAddr_valid, address_align, offset = 0;
-	uAddr = address & 0xFF000000;
-	if ((uAddr == (amDATA << 24)) || (uAddr == (amDATA << 24) * 2) || (uAddr == (amDATA << 24) * 4)) {
-		address = (address & 0x00FFFFFF) | (amDATA << 24);
+
+	uAddr = address & 0x00FF0000;
+	if ((uAddr == (amDATA << 16)) || (uAddr == (amDATA << 16) * 2) || (uAddr == (amDATA << 16) * 4)) {
+		address = (address & 0x0000FFFF) | (amDATA << 16);
 	}
-	else if ((uAddr == (amIDATA << 24)) || (uAddr == (amIDATA << 24) * 2) || (uAddr == (amIDATA << 24) * 4)) {
-		address = (address & 0x00FFFFFF) | (amIDATA << 24);
+	else if ((uAddr == (amDATA1 << 16)) || (uAddr == (amDATA1 << 16) * 2) || (uAddr == (amDATA1 << 16) * 4)) {
+		address = (address & 0x0000FFFF) | (amDATA1 << 16);
 	}
-	else if ((uAddr == (amXDATA << 24)) || (uAddr == (amXDATA << 24) * 2) || (uAddr == (amXDATA << 24) * 4)) {
-		address = (address & 0x00FFFFFF) | (amXDATA << 24);
+	else if ((uAddr == (amDATA2 << 16)) || (uAddr == (amDATA2 << 16) * 2) || (uAddr == (amDATA2 << 16) * 4)) {
+		address = (address & 0x0000FFFF) | (amDATA2 << 16);
+	}
+	else if ((uAddr == (amDATA3 << 16)) || (uAddr == (amDATA3 << 16) * 2) || (uAddr == (amDATA3 << 16) * 4)) {
+		address = (address & 0x0000FFFF) | (amDATA3 << 16);
+	}
+	else if ((uAddr == (amIDATA << 16)) || (uAddr == (amIDATA << 16) * 2) || (uAddr == (amIDATA << 16) * 4)) {
+		address = (address & 0x0000FFFF) | (amIDATA << 16);
+	}
+	else if ((uAddr == (amXDATA << 16)) || (uAddr == (amXDATA << 16) * 2) || (uAddr == (amXDATA << 16) * 4)) {
+		address = (address & 0x0000FFFF) | (amXDATA << 16);
 	}
 
-	uAddr_valid = (address & 0xFFFFFF) >> 16;
-	if (uAddr_valid == 0xFF) {
-		address_align = (address + size * count) & 0xFF000000;
-		offset = address_align - address;
-		count = count - (offset / size);
-		address = address_align;
-	}
 
-	uZone = address >> 24;
-	uAddr = address & 0xFFFFFF;
 
+	uZone = (address >> 16) & 0xFF;
+	
 	switch (uZone)				// extract mSpace from address.
 	{
 		case amDATA:			// Data
+		case amDATA1:			
+		case amDATA2:			
+		case amDATA3:			
 		{
 			LOG_DEBUG("amDATA1");
+			uAddr = address & 0x0FFFFF;
 			retval = ReadData(target, uAddr, size, count, buffer + offset);
 			break;	
 		}
 		case amIDATA:			// Idata
 		{
 			LOG_DEBUG("amIDATA1");
+			uAddr = address & 0x00FFFF;
 			retval = ReadIdata(target, uAddr, size, count, buffer + offset);
 			break;
 		}
 		case amXDATA:			// Xdata
 		{
 			LOG_DEBUG("amXDATA1");
+			uAddr = address & 0x00FFFF;
 			retval = ReadXdata(target, uAddr, size, count, buffer + offset);
 			break;
 		}
@@ -1180,6 +1189,7 @@ int numicro8051_read_memory(struct target *target, uint32_t address,
 		default:
 		{
 			LOG_DEBUG("amCODE1");
+			uAddr = address & 0x00FFFF;
 			retval = ReadCode(target, uAddr, size, count, buffer + offset);
 			break;
 		}
@@ -1497,45 +1507,52 @@ int numicro8051_write_memory(struct target *target, uint32_t address,
 	int retval;
 	unsigned long uZone, uAddr, uAddr_valid, address_align, offset = 0;
 
-	uAddr = address & 0xFF000000;
-	if ((uAddr == (amDATA << 24)) || (uAddr == (amDATA << 24) * 2) || (uAddr == (amDATA << 24) * 4)) {
-		address = (address & 0x00FFFFFF) | (amDATA << 24);
+	uAddr = address & 0x00FF0000;
+	if ((uAddr == (amDATA << 16)) || (uAddr == (amDATA << 16) * 2) || (uAddr == (amDATA << 16) * 4)) {
+		address = (address & 0x0000FFFF) | (amDATA << 16);
 	}
-	else if ((uAddr == (amIDATA << 24)) || (uAddr == (amIDATA << 24) * 2) || (uAddr == (amIDATA << 24) * 4)) {
-		address = (address & 0x00FFFFFF) | (amIDATA << 24);
+	else if ((uAddr == (amDATA1 << 16)) || (uAddr == (amDATA1 << 16) * 2) || (uAddr == (amDATA1 << 16) * 4)) {
+		address = (address & 0x0000FFFF) | (amDATA1 << 16);
 	}
-	else if ((uAddr == (amXDATA << 24)) || (uAddr == (amXDATA << 24) * 2) || (uAddr == (amXDATA << 24) * 4)) {
-		address = (address & 0x00FFFFFF) | (amXDATA << 24);
+	else if ((uAddr == (amDATA2 << 16)) || (uAddr == (amDATA2 << 16) * 2) || (uAddr == (amDATA2 << 16) * 4)) {
+		address = (address & 0x0000FFFF) | (amDATA2 << 16);
+	}
+	else if ((uAddr == (amDATA3 << 16)) || (uAddr == (amDATA3 << 16) * 2) || (uAddr == (amDATA3 << 16) * 4)) {
+		address = (address & 0x0000FFFF) | (amDATA3 << 16);
+	}
+	else if ((uAddr == (amIDATA << 16)) || (uAddr == (amIDATA << 16) * 2) || (uAddr == (amIDATA << 16) * 4)) {
+		address = (address & 0x0000FFFF) | (amIDATA << 16);
+	}
+	else if ((uAddr == (amXDATA << 16)) || (uAddr == (amXDATA << 16) * 2) || (uAddr == (amXDATA << 16) * 4)) {
+		address = (address & 0x0000FFFF) | (amXDATA << 16);
 	}
 
-	uAddr_valid = (address & 0xFFFFFF) >> 16;
-	if (uAddr_valid == 0xFF) {
-		address_align = (address + size * count) & 0xFF000000;
-		offset = address_align - address;
-		count = count - (offset / size);
-		address = address_align;
-	}
 
-	uZone = (address >> 24) & 0xFF;
-	uAddr = address & 0xFFFFFF;
+	uZone = (address >> 16) & 0xFF;
 
 	switch (uZone)				// extract mSpace from address.
 	{
 		case amDATA:			// Data
+		case amDATA1:			
+		case amDATA2:			
+		case amDATA3:
 		{
 			LOG_DEBUG("amDATA1");
+			uAddr = address & 0x0FFFFF;
 			retval = WriteData(target, uAddr, size, count, buffer + offset);
 			break;
 		}
 		case amIDATA:			// Idata
 		{
 			LOG_DEBUG("amIDATA1");
+			uAddr = address & 0x00FFFF;
 			retval = WriteIdata(target, uAddr, size, count, buffer + offset);
 			break;
 		}
 		case amXDATA:			// Xdata
 		{
 			LOG_DEBUG("amXDATA1");
+			uAddr = address & 0x00FFFF;
 			retval = WriteXdata(target, uAddr, size, count, buffer + offset);
 			break;
 		}
@@ -1543,6 +1560,7 @@ int numicro8051_write_memory(struct target *target, uint32_t address,
 		default:
 		{
 			LOG_DEBUG("amCODE1");
+			uAddr = address & 0x00FFFF;
 			retval = WriteCode(target, uAddr, size, count, buffer + offset);
 			break;
 		}
@@ -1550,7 +1568,7 @@ int numicro8051_write_memory(struct target *target, uint32_t address,
 
 	return retval;
 }
-//
+
 static int numicro8051_get_core_reg(struct reg *reg)
 {
 	int retval = ERROR_OK;
