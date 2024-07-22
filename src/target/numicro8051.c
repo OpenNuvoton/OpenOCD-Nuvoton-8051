@@ -1133,7 +1133,15 @@ int numicro8051_read_memory(struct target *target, uint32_t address,
 	uint32_t size, uint32_t count, uint8_t *buffer)
 {
 	int retval;
-	unsigned long uZone, uAddr, uAddr_valid, address_align, offset = 0;
+	unsigned long uZone, uAddr, address_align, offset = 0;
+	
+	address_align = (address + size * count) & 0xFF0000;
+
+	if (address < address_align) {
+		offset = address_align - address;
+		count = count - (offset / size);
+		address = address_align;
+	}
 
 	uAddr = address & 0x00FF0000;
 	if ((uAddr == (amDATA << 16)) || (uAddr == (amDATA << 16) * 2) || (uAddr == (amDATA << 16) * 4)) {
@@ -1154,8 +1162,6 @@ int numicro8051_read_memory(struct target *target, uint32_t address,
 	else if ((uAddr == (amXDATA << 16)) || (uAddr == (amXDATA << 16) * 2) || (uAddr == (amXDATA << 16) * 4)) {
 		address = (address & 0x0000FFFF) | (amXDATA << 16);
 	}
-
-
 
 	uZone = (address >> 16) & 0xFF;
 	
@@ -1505,7 +1511,15 @@ int numicro8051_write_memory(struct target *target, uint32_t address,
 	uint32_t size, uint32_t count, const uint8_t *buffer)
 {
 	int retval;
-	unsigned long uZone, uAddr, uAddr_valid, address_align, offset = 0;
+	unsigned long uZone, uAddr, address_align, offset = 0;
+
+	address_align = (address + size * count) & 0xFF0000;
+
+	if (address < address_align) {
+		offset = address_align - address;
+		count = count - (offset / size);
+		address = address_align;
+	}
 
 	uAddr = address & 0x00FF0000;
 	if ((uAddr == (amDATA << 16)) || (uAddr == (amDATA << 16) * 2) || (uAddr == (amDATA << 16) * 4)) {
@@ -1526,7 +1540,6 @@ int numicro8051_write_memory(struct target *target, uint32_t address,
 	else if ((uAddr == (amXDATA << 16)) || (uAddr == (amXDATA << 16) * 2) || (uAddr == (amXDATA << 16) * 4)) {
 		address = (address & 0x0000FFFF) | (amXDATA << 16);
 	}
-
 
 	uZone = (address >> 16) & 0xFF;
 
